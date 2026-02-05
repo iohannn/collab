@@ -402,7 +402,9 @@ async def create_or_update_influencer_profile(request: Request, data: Influencer
     # Update user type
     await db.users.update_one({'user_id': user['user_id']}, {'$set': {'user_type': 'influencer'}})
     
-    return profile_dict
+    # Return clean profile without _id
+    clean_profile = {k: v for k, v in profile_dict.items() if k != '_id'}
+    return clean_profile
 
 @api_router.get("/influencers/{username}")
 async def get_public_influencer_profile(username: str):
