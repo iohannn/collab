@@ -469,7 +469,9 @@ async def create_collaboration(request: Request, data: CollaborationCreate):
     }
     
     await db.collaborations.insert_one(collab_doc)
-    return collab_doc
+    # Return clean collaboration without _id
+    clean_collab = {k: v for k, v in collab_doc.items() if k != '_id'}
+    return clean_collab
 
 @api_router.get("/collaborations")
 async def list_collaborations(
