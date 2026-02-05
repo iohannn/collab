@@ -245,7 +245,7 @@ async def register(data: UserCreate):
     await db.users.insert_one(user_doc)
     
     token = create_jwt_token(user_id, data.email)
-    user_response = {k: v for k, v in user_doc.items() if k != 'password_hash'}
+    user_response = {k: v for k, v in user_doc.items() if k not in ['password_hash', '_id']}
     return {'token': token, 'user': user_response}
 
 @api_router.post("/auth/login")
