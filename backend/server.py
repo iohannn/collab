@@ -367,7 +367,9 @@ async def create_or_update_brand_profile(request: Request, profile: BrandProfile
     # Update user type
     await db.users.update_one({'user_id': user['user_id']}, {'$set': {'user_type': 'brand'}})
     
-    return profile_dict
+    # Return clean profile without _id
+    clean_profile = {k: v for k, v in profile_dict.items() if k != '_id'}
+    return clean_profile
 
 # ============ INFLUENCER PROFILE ENDPOINTS ============
 
