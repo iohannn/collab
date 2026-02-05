@@ -1,0 +1,141 @@
+{
+  "identity": {
+    "name": "colaboreaza.ro",
+    "persona": "The Modern Gallery Marketplace",
+    "vibe": "Trust-focused, Urgent, Professional, Electric",
+    "archetype": "Swiss & High-Contrast"
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Clash Display, Outfit, sans-serif",
+      "weights": ["500", "600", "700"],
+      "tracking": "tight",
+      "usage": "All section headers, hero titles, and major calls to action. DO NOT use Inter for headings."
+    },
+    "body": {
+      "font_family": "Satoshi, Inter, sans-serif",
+      "weights": ["400", "500"],
+      "tracking": "normal",
+      "usage": "Paragraphs, UI labels, inputs, and data tables."
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "usage": "Pricing numbers, countdown timers, and technical data."
+    }
+  },
+  "colors": {
+    "background": {
+      "default": "#FFFFFF",
+      "subtle": "#F9FAFB",
+      "paper": "#F3F4F6"
+    },
+    "foreground": {
+      "default": "#111827",
+      "muted": "#6B7280",
+      "inverse": "#FFFFFF"
+    },
+    "primary": {
+      "default": "#FF4F00",
+      "hover": "#EA4600",
+      "foreground": "#FFFFFF",
+      "description": "Electric International Orange. Use for Primary CTAs, Urgency indicators, and 'Apply' buttons."
+    },
+    "secondary": {
+      "default": "#4338CA",
+      "hover": "#3730A3",
+      "foreground": "#FFFFFF",
+      "description": "Deep Indigo. Use for Trust badges, 'Pro' features, and Verified ticks."
+    },
+    "accent": {
+      "success": "#059669",
+      "warning": "#D97706",
+      "error": "#DC2626",
+      "info": "#2563EB"
+    },
+    "border": {
+      "default": "#E5E7EB",
+      "strong": "#D1D5DB"
+    }
+  },
+  "layout": {
+    "spacing": {
+      "container_padding": "p-6 md:p-12 lg:p-24",
+      "section_gap": "gap-16 md:gap-32",
+      "element_gap": "gap-4 md:gap-8"
+    },
+    "grid_system": {
+      "marketing": "Bento Grid (Grid-cols-12). Use col-span-full for hero, col-span-6 for features, col-span-4 for cards.",
+      "dashboard": "High Density Grid. Sidebar fixed, main content scrollable. Widgets use col-span-1 to col-span-3."
+    },
+    "radius": {
+      "default": "rounded-none",
+      "buttons": "rounded-full",
+      "cards": "rounded-xl",
+      "inputs": "rounded-md"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary-hover rounded-full px-8 py-4 font-semibold transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-primary/20",
+      "secondary": "bg-white text-foreground border border-border hover:bg-gray-50 rounded-full px-6 py-3 font-medium transition-colors",
+      "ghost": "text-muted-foreground hover:text-foreground hover:bg-gray-100 rounded-md px-4 py-2"
+    },
+    "cards": {
+      "listing": "bg-white border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 rounded-xl overflow-hidden group relative",
+      "dashboard": "bg-white border border-border/60 shadow-sm rounded-xl p-6"
+    },
+    "inputs": {
+      "default": "bg-white border border-input focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-md h-12 px-4 transition-all"
+    },
+    "badges": {
+      "urgent": "bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wider rounded-sm",
+      "new": "bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wider rounded-sm"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": "Use 'shadow-sm' for dashboard cards, 'shadow-xl' for hovering marketing elements. Avoid heavy drop shadows.",
+    "gradients": "NO full background gradients. Use subtle mesh gradients in 'mask-image' or text gradients for emphasis only.",
+    "textures": "Add a subtle noise texture overlay (opacity 0.03) to the entire body to kill the digital flatness.",
+    "borders": "Use 1px borders everywhere. For 'Active' states, use a 2px border in Primary color."
+  },
+  "motion": {
+    "hover": "transition-all duration-300 ease-out",
+    "entrance": "animate-in fade-in slide-in-from-bottom-4 duration-700",
+    "micro": "Active elements should scale down slightly (0.98) on click."
+  },
+  "image_urls": {
+    "hero_creator": {
+      "url": "https://images.unsplash.com/photo-1600140094209-bea02144c09c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwyfHxjb250ZW50JTIwY3JlYXRvciUyMGZpbG1pbmclMjB3aXRoJTIwcGhvbmUlMjBzdHVkaW8lMjBsaWdodGluZ3xlbnwwfHx8fDE3NzAzMjgzOTl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Man in floral shirt holding DSLR camera, dynamic angle. Use for Hero section background or main visual.",
+      "category": "hero"
+    },
+    "diverse_group": {
+      "url": "https://images.unsplash.com/photo-1667515523836-eb88a107709a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwyfHxkaXZlcnNlJTIwZ3JvdXAlMjBvZiUyMGNyZWF0aXZlJTIwcGVvcGxlJTIwd29ya2luZyUyMHRvZ2V0aGVyfGVufDB8fHx8MTc3MDMyODQxM3ww&ixlib=rb-4.1.0&q=85",
+      "description": "Group of diverse people posing. Use for 'Community' or 'About Us' section.",
+      "category": "community"
+    },
+    "startup_hub": {
+      "url": "https://images.unsplash.com/photo-1733925457822-64c3e048fa1b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHx0ZWNoJTIwc3RhcnR1cCUyMGxvZ28lMjBtb2Rlcm4lMjBtaW5pbWFsfGVufDB8fHx8MTc3MDMyODQwNHww&ixlib=rb-4.1.0&q=85",
+      "description": "Building with 'Startup Hub' sign. Use as a subtle background for the 'For Brands' section.",
+      "category": "brands"
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. THEME: Implement a 'Light Mode' first design. It must feel like a high-end art gallery but for jobs.",
+    "2. TYPOGRAPHY: Load 'Clash Display' from Google Fonts or a similar CDN. If not available, use 'Outfit'. This is non-negotiable for the brand identity.",
+    "3. LAYOUT: The 'Collaboration Listings' must NOT be a simple list. Use a Grid of Cards. Each card should look like a 'Ticket' or a 'Deal' with a clear price tag and countdown timer.",
+    "4. URGENCY: Use the 'Primary' color (Electric Orange) for all countdowns and 'Apply Now' buttons. This creates the FOMO effect requested.",
+    "5. DASHBOARD: Keep the dashboard clean. Use a sidebar layout. The 'Create Collaboration' form should be a multi-step wizard, not a long boring form.",
+    "6. LOGOS: Since we don't have specific brand logos, create a 'Marquee' component that scrolls text names of brands (e.g., 'NIKE', 'ADIDAS', 'TECHSTYLE') in a bold, gray font.",
+    "7. LANGUAGE: The app is bilingual (RO/EN). Ensure all text is wrapped in a translation helper or prepared for i18n.",
+    "8. TESTING: Add 'data-testid' to all interactive elements (buttons, inputs, cards)."
+  ],
+  "universal_guidelines": [
+    "Avoid generic centered layouts.",
+    "Create depth through layered design elements.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for sticky headers.",
+    "Every interaction needs micro-animations.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Subtle grain textures overlay is recommended."
+  ]
+}
