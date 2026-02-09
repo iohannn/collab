@@ -167,6 +167,9 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Top 10 Influencers */}
+      <TopInfluencers />
+
       {/* How It Works */}
       <section className="py-20 lg:py-32 bg-foreground text-background">
         <div className="max-w-7xl mx-auto px-6">
