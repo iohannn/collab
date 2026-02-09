@@ -1558,6 +1558,54 @@ async def get_influencer_analytics(request: Request):
         'monthly_trend': monthly_data
     }
 
+# ============ COMMISSION ENDPOINTS ============
+
+async def get_commission_rate() -> float:
+    """Get current commission rate from DB, or use default"""
+    settings = await db.settings.find_one({'key': 'commission_rate'}, {'_id': 0})
+    if settings:
+        return settings['value']
+    return DEFAULT_COMMISSION_RATE
+
+@api_router.get("/settings/commission")
+async def get_commission(request: Request):
+    """Get current commission rate (admin only)"""
+    await require_admin(request)
+    rate = await get_commission_rate()
+    return {'commission_rate': rate}
+
+@api_router.put("/settings/commission")
+async def update_commission(request: Request):
+    """Update commission rate (admin only)"""
+    await require_admin(request)
+    body = await request.json()
+    new_rate = body.get('commission_rate')
+    
+    if new_rate is None or not (0 <= new_rate <= 100):
+        raise HTTPException(status_code=400, detail="Commission rate must be between 0 and 100")
+    
+    await db.settings.update_one(
+        {'key': 'commission_rate'},
+        {'$set': {'key': 'commission_rate', 'value': float(new_rate), 'updated_at': datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    
+    return {'commission_rate': float(new_rate)}
+
+@api_router.get("/commission/calculate")
+async def calculate_commission(amount: float, request: Request):
+    """Calculate commission for a given amount"""
+    await require_auth(request)
+    rate = await get_commission_rate()
+    commission = round(amount * rate / 100, 2)
+    net_amount = round(amount - commission, 2)
+    return {
+        'gross_amount': amount,
+        'commission_rate': rate,
+        'commission_amount': commission,
+        'net_amount': net_amount
+    }
+
 # ============ STATS ENDPOINTS ============
 
 @api_router.get("/stats/public")
