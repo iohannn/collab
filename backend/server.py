@@ -1225,6 +1225,28 @@ async def update_influencer_rating(user_id: str):
             {'$set': {'avg_rating': avg_rating, 'review_count': review_count}}
         )
 
+async def auto_reveal_timed_out_reviews():
+    """Auto-reveal reviews older than REVIEW_REVEAL_TIMEOUT_DAYS"""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=REVIEW_REVEAL_TIMEOUT_DAYS)).isoformat()
+    unrevealed = await db.reviews.find(
+        {'is_revealed': False, 'created_at': {'$lt': cutoff}},
+        {'_id': 0}
+    ).to_list(100)
+    
+    if unrevealed:
+        review_ids = [r['review_id'] for r in unrevealed]
+        await db.reviews.update_many(
+            {'review_id': {'$in': review_ids}},
+            {'$set': {'is_revealed': True}}
+        )
+        # Update ratings for affected influencers
+        affected_user_ids = set()
+        for r in unrevealed:
+            if r.get('reviewer_type') == 'brand':
+                affected_user_ids.add(r['reviewed_user_id'])
+        for uid in affected_user_ids:
+            await update_influencer_rating(uid)
+
 @api_router.get("/reviews/user/{user_id}")
 async def get_user_reviews(user_id: str, limit: int = 20, skip: int = 0):
     """Get reviews for a user (only revealed reviews)"""
