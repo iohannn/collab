@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { CollaborationCard } from '../components/CollaborationCard';
+import { PendingReviewsBanner } from '../components/ReviewDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import {
   UserCircle, Edit2, Save, Instagram, Youtube, Music2,
-  Briefcase, TrendingUp, Clock, CheckCircle, XCircle, ExternalLink
+  Briefcase, TrendingUp, Clock, CheckCircle, XCircle, ExternalLink, Star
 } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
