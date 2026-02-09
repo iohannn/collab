@@ -587,6 +587,68 @@ async def list_influencers(
     profiles = await db.influencer_profiles.find(query, {'_id': 0}).skip(skip).limit(limit).to_list(limit)
     return profiles
 
+# ============ OEMBED ENDPOINT ============
+
+@api_router.get("/oembed")
+async def get_oembed(url: str):
+    """Fetch oEmbed data for social media posts"""
+    import re
+    
+    oembed_endpoints = {
+        'youtube': 'https://www.youtube.com/oembed',
+        'tiktok': 'https://www.tiktok.com/oembed',
+        'instagram': 'https://api.instagram.com/oembed',  # Requires auth but try anyway
+    }
+    
+    # Detect platform from URL
+    platform = None
+    if 'youtube.com' in url or 'youtu.be' in url:
+        platform = 'youtube'
+    elif 'tiktok.com' in url:
+        platform = 'tiktok'
+    elif 'instagram.com' in url:
+        platform = 'instagram'
+    
+    if not platform:
+        raise HTTPException(status_code=400, detail="Unsupported URL")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                oembed_endpoints[platform],
+                params={'url': url, 'format': 'json', 'maxwidth': 500},
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'platform': platform,
+                    'title': data.get('title', ''),
+                    'author_name': data.get('author_name', ''),
+                    'author_url': data.get('author_url', ''),
+                    'thumbnail_url': data.get('thumbnail_url', ''),
+                    'html': data.get('html', ''),
+                    'width': data.get('width'),
+                    'height': data.get('height'),
+                }
+            else:
+                # Return basic info for unsupported/failed requests
+                return {
+                    'platform': platform,
+                    'url': url,
+                    'html': None,
+                    'error': 'Could not fetch embed data'
+                }
+    except Exception as e:
+        logger.error(f"oEmbed error for {url}: {e}")
+        return {
+            'platform': platform,
+            'url': url,
+            'html': None,
+            'error': str(e)
+        }
+
 # ============ COLLABORATION ENDPOINTS ============
 
 @api_router.post("/collaborations")
