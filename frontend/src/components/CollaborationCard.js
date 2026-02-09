@@ -59,9 +59,20 @@ export const CollaborationCard = ({ collaboration, onClick, locked = false }) =>
   return (
     <div 
       onClick={onClick}
-      className="ticket-card bg-white border border-border hover:border-primary/50 rounded-xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group relative"
+      className="ticket-card bg-white border border-border hover:border-primary/50 rounded-xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group relative overflow-hidden"
       data-testid={`collab-card-${collaboration.collab_id}`}
     >
+      {/* Lock Overlay for non-authenticated users */}
+      {locked && (
+        <div className="absolute inset-0 z-20 bg-white/70 backdrop-blur-[6px] flex flex-col items-center justify-center rounded-xl" data-testid="collab-lock-overlay">
+          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+            <Lock className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-semibold text-foreground mb-1">Detalii disponibile după autentificare</p>
+          <p className="text-xs text-muted-foreground">Creează un cont gratuit pentru acces complet</p>
+        </div>
+      )}
+
       {/* Platform Badge */}
       <div className={`absolute top-4 right-4 ${getPlatformColor(collaboration.platform)} text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1`}>
         {getPlatformIcon(collaboration.platform)}
