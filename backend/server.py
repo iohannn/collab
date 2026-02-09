@@ -543,7 +543,14 @@ async def get_public_influencer_profile(username: str):
         raise HTTPException(status_code=404, detail="Influencer not found")
     
     user = await db.users.find_one({'user_id': profile['user_id']}, {'_id': 0, 'password_hash': 0})
-    return {**profile, 'user': user}
+    
+    # Get recent reviews
+    reviews = await db.reviews.find(
+        {'reviewed_user_id': profile['user_id'], 'reviewer_type': 'brand'},
+        {'_id': 0}
+    ).sort('created_at', -1).limit(5).to_list(5)
+    
+    return {**profile, 'user': user, 'reviews': reviews}
 
 @api_router.get("/influencers")
 async def list_influencers(
