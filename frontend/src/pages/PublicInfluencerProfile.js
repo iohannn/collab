@@ -249,6 +249,11 @@ const PublicInfluencerProfile = () => {
               </div>
             )}
 
+            {/* Social Media Posts */}
+            {profile.featured_posts?.length > 0 && (
+              <SocialPostsCarousel posts={profile.featured_posts} title="Postări recente" />
+            )}
+
             {/* Previous Collaborations */}
             {profile.previous_collaborations?.length > 0 && (
               <div>
