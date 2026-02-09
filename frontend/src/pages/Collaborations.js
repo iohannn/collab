@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { CollaborationCard } from '../components/CollaborationCard';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Search, Filter, SlidersHorizontal } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, X } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -13,21 +13,22 @@ const API = `${BACKEND_URL}/api`;
 const Collaborations = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [collaborations, setCollaborations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [platform, setPlatform] = useState('all');
-  const [search, setSearch] = useState('');
+  const [platform, setPlatform] = useState(searchParams.get('platform') || 'all');
+  const [search, setSearch] = useState(searchParams.get('q') || '');
+  const [searchInput, setSearchInput] = useState(searchParams.get('q') || '');
 
-  useEffect(() => {
-    fetchCollaborations();
-  }, [platform]);
-
-  const fetchCollaborations = async () => {
+  const fetchCollaborations = useCallback(async () => {
     setLoading(true);
     try {
       let url = `${API}/collaborations?status=active`;
       if (platform && platform !== 'all') {
         url += `&platform=${platform}`;
+      }
+      if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
       }
       
       const response = await fetch(url);
@@ -40,14 +41,37 @@ const Collaborations = () => {
     } finally {
       setLoading(false);
     }
+  }, [platform, search]);
+
+  useEffect(() => {
+    fetchCollaborations();
+  }, [fetchCollaborations]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearch(searchInput);
+    const params = new URLSearchParams();
+    if (searchInput) params.set('q', searchInput);
+    if (platform !== 'all') params.set('platform', platform);
+    setSearchParams(params);
   };
 
-  const filteredCollabs = collaborations.filter((c) =>
-    search
-      ? c.title.toLowerCase().includes(search.toLowerCase()) ||
-        c.brand_name.toLowerCase().includes(search.toLowerCase())
-      : true
-  );
+  const clearSearch = () => {
+    setSearch('');
+    setSearchInput('');
+    setSearchParams({});
+  };
+
+  const handlePlatformChange = (value) => {
+    setPlatform(value);
+    const params = new URLSearchParams(searchParams);
+    if (value !== 'all') {
+      params.set('platform', value);
+    } else {
+      params.delete('platform');
+    }
+    setSearchParams(params);
+  };
 
   return (
     <div className="min-h-screen bg-muted/30 py-8">
