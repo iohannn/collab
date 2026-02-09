@@ -19,8 +19,10 @@ import { toast } from 'sonner';
 import {
   Users, TrendingUp, DollarSign, Flag, Search, Shield,
   Ban, CheckCircle, XCircle, Eye, Trash2, AlertTriangle,
-  Building2, UserCircle, Crown, BarChart3
+  Building2, UserCircle, Crown, BarChart3, MessageSquare, Unlock, Undo2
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Textarea } from '../components/ui/textarea';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
