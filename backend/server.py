@@ -764,6 +764,35 @@ async def update_collaboration_status(collab_id: str, request: Request):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {'status': new_status}})
+    
+    # When collaboration is completed, calculate and record commission
+    if new_status == 'completed':
+        rate = await get_commission_rate()
+        accepted_apps = await db.applications.find({
+            'collab_id': collab_id,
+            'status': 'accepted'
+        }, {'_id': 0}).to_list(100)
+        
+        for app in accepted_apps:
+            proposed_price = app.get('proposed_price') or collab.get('budget_min', 0)
+            if proposed_price:
+                commission = round(proposed_price * rate / 100, 2)
+                net_amount = round(proposed_price - commission, 2)
+                
+                await db.commissions.insert_one({
+                    'commission_id': f"comm_{uuid.uuid4().hex[:12]}",
+                    'collab_id': collab_id,
+                    'application_id': app['application_id'],
+                    'brand_user_id': collab['brand_user_id'],
+                    'influencer_user_id': app['influencer_user_id'],
+                    'gross_amount': proposed_price,
+                    'commission_rate': rate,
+                    'commission_amount': commission,
+                    'net_amount': net_amount,
+                    'status': 'pending',
+                    'created_at': datetime.now(timezone.utc).isoformat()
+                })
+    
     return {'success': True}
 
 # ============ APPLICATION ENDPOINTS ============
