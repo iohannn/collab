@@ -236,6 +236,26 @@ const CollaborationDetail = () => {
               </div>
             )}
 
+            {/* Payment Protection Banner */}
+            {collaboration.collaboration_type === 'paid' && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-8 flex items-start gap-3" data-testid="escrow-trust-banner">
+                <Shield className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-green-800">Colaborare protejată</p>
+                  <p className="text-sm text-green-600">
+                    {collaboration.payment_status === 'secured' 
+                      ? 'Fondurile sunt securizate. Plata creatorului este garantată la finalizare.'
+                      : collaboration.payment_status === 'released'
+                      ? 'Fondurile au fost eliberate cu succes.'
+                      : 'Fondurile vor fi securizate de brand înainte de începerea colaborării.'}
+                  </p>
+                </div>
+                {collaboration.payment_status === 'secured' && (
+                  <Badge className="bg-green-600 text-white ml-auto flex-shrink-0">Securizat</Badge>
+                )}
+              </div>
+            )}
+
             {/* Description */}
             <div className="mb-8">
               <h2 className="text-xl font-heading font-semibold mb-4">{t('collab.description')}</h2>
