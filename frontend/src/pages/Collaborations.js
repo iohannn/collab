@@ -148,15 +148,49 @@ const Collaborations = () => {
             ))}
           </div>
         ) : collaborations.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {collaborations.map((collab) => (
-              <CollaborationCard
-                key={collab.collab_id}
-                collaboration={collab}
-                onClick={() => navigate(`/collaborations/${collab.collab_id}`)}
-              />
-            ))}
-          </div>
+          <>
+            {/* Auth CTA Banner for non-logged-in users */}
+            {!isAuthenticated && (
+              <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-5 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4" data-testid="auth-cta-banner">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Lock className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Deblochează toate colaborările</p>
+                    <p className="text-sm text-muted-foreground">Creează un cont gratuit pentru a vedea detalii și a aplica</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => navigate('/login?redirect=/collaborations')} data-testid="cta-login-btn">
+                    <LogIn className="w-4 h-4 mr-1" />
+                    Autentifică-te
+                  </Button>
+                  <Button size="sm" onClick={() => navigate('/register?redirect=/collaborations')} data-testid="cta-register-btn">
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Cont gratuit
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {collaborations.map((collab, index) => (
+                <CollaborationCard
+                  key={collab.collab_id}
+                  collaboration={collab}
+                  locked={!isAuthenticated && index >= 2}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      navigate(`/login?redirect=/collaborations/${collab.collab_id}`);
+                    } else {
+                      navigate(`/collaborations/${collab.collab_id}`);
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          </>
         ) : (
           <div className="text-center py-20 bg-white rounded-2xl border border-border">
             <Filter className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
