@@ -1118,7 +1118,7 @@ async def update_application_status(application_id: str, request: Request):
 
 @api_router.post("/reviews")
 async def create_review(request: Request, data: ReviewCreate):
-    """Create a review for a completed collaboration"""
+    """Create a review for a completed collaboration (mutual reveal)"""
     user = await require_auth(request)
     
     # Get the application
@@ -1135,9 +1135,16 @@ async def create_review(request: Request, data: ReviewCreate):
     if not collab:
         raise HTTPException(status_code=404, detail="Collaboration not found")
     
-    # Collaboration must be completed
-    if collab['status'] != 'completed':
-        raise HTTPException(status_code=400, detail="Collaboration must be completed before reviewing")
+    is_paid = collab.get('collaboration_type', 'paid') == 'paid'
+    
+    # For paid collaborations: require funds released
+    if is_paid:
+        if collab.get('payment_status') != 'released':
+            raise HTTPException(status_code=400, detail="Recenziile sunt disponibile doar după eliberarea fondurilor")
+    else:
+        # For free/barter: collaboration must be completed
+        if collab['status'] not in ('completed', 'completed_pending_release'):
+            raise HTTPException(status_code=400, detail="Colaborarea trebuie finalizată înainte de recenzie")
     
     # Determine reviewer type and reviewed user
     is_brand = collab['brand_user_id'] == user['user_id']
@@ -1169,14 +1176,35 @@ async def create_review(request: Request, data: ReviewCreate):
         'rating': data.rating,
         'comment': data.comment,
         'collab_title': collab['title'],
+        'is_revealed': False,  # Hidden until both submit or timeout
         'created_at': datetime.now(timezone.utc).isoformat()
     }
     
     await db.reviews.insert_one(review_doc)
     
-    # Update influencer's average rating if reviewed by brand
-    if is_brand:
-        await update_influencer_rating(app['influencer_user_id'])
+    # Check if both parties have now reviewed → reveal both
+    other_review = await db.reviews.find_one({
+        'application_id': data.application_id,
+        'reviewer_user_id': {'$ne': user['user_id']}
+    })
+    
+    if other_review:
+        # Both reviews exist → reveal simultaneously
+        await db.reviews.update_many(
+            {'application_id': data.application_id},
+            {'$set': {'is_revealed': True}}
+        )
+        # Now update ratings
+        if is_brand:
+            await update_influencer_rating(app['influencer_user_id'])
+        else:
+            # Find the brand review and update influencer rating
+            brand_review = await db.reviews.find_one({
+                'application_id': data.application_id,
+                'reviewer_type': 'brand'
+            })
+            if brand_review:
+                await update_influencer_rating(app['influencer_user_id'])
     
     clean_review = {k: v for k, v in review_doc.items() if k != '_id'}
     return clean_review
