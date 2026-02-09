@@ -323,6 +323,14 @@ const AdminDashboard = () => {
               <DollarSign className="w-4 h-4 mr-2" />
               Comisioane
             </TabsTrigger>
+            <TabsTrigger value="disputes" data-testid="admin-tab-disputes" className={disputes.disputes.filter(d => d.status !== 'resolved').length > 0 ? 'text-red-600' : ''}>
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Dispute ({disputes.disputes.filter(d => d.status !== 'resolved').length})
+            </TabsTrigger>
+            <TabsTrigger value="cancellations" data-testid="admin-tab-cancellations">
+              <XCircle className="w-4 h-4 mr-2" />
+              Anulări ({cancellations.cancellations.filter(c => c.status === 'pending_admin_review').length})
+            </TabsTrigger>
           </TabsList>
 
           {/* Users Tab */}
