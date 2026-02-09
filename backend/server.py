@@ -978,22 +978,6 @@ async def get_pending_reviews(request: Request):
     
     return pending
 
-@api_router.get("/influencers/top")
-async def get_top_influencers(limit: int = 10):
-    """Get top influencers by rating"""
-    # Get influencers with ratings, sorted by avg_rating desc
-    influencers = await db.influencer_profiles.find(
-        {'avg_rating': {'$exists': True, '$gt': 0}},
-        {'_id': 0}
-    ).sort('avg_rating', -1).limit(limit).to_list(limit)
-    
-    # Enrich with user data
-    for inf in influencers:
-        user = await db.users.find_one({'user_id': inf['user_id']}, {'_id': 0, 'password_hash': 0})
-        inf['user'] = user
-    
-    return influencers
-
 # ============ PAYMENT ENDPOINTS ============
 
 PRO_PLANS = {
