@@ -464,6 +464,62 @@ class ColaboreazaAPITester:
         self.log_test("Non-admin users access", status == 403,
                      f"Status: {status} (should be 403), Response: {data}")
 
+    def test_review_system(self):
+        """Test review system functionality"""
+        print("\n🔍 Testing Review System...")
+        
+        # Test top influencers endpoint
+        success, data, status = self.make_request('GET', 'influencers/top?limit=10')
+        self.log_test("Top influencers endpoint", success and status == 200,
+                     f"Status: {status}, Count: {len(data) if isinstance(data, list) else 'N/A'}")
+        
+        # Test pending reviews endpoint (requires auth)
+        if self.token:
+            success, data, status = self.make_request('GET', 'reviews/pending')
+            self.log_test("Pending reviews endpoint", success and status == 200,
+                         f"Status: {status}, Count: {len(data) if isinstance(data, list) else 'N/A'}")
+        
+        # Test creating a review (requires completed collaboration)
+        # This will likely fail as we need proper setup, but we test the endpoint
+        if self.token:
+            success, data, status = self.make_request('POST', 'reviews', {
+                "application_id": "test_app_id",
+                "rating": 5,
+                "comment": "Test review"
+            })
+            # Expect 404 or 400 since application doesn't exist
+            self.log_test("Create review endpoint", status in [400, 404],
+                         f"Status: {status} (expected 400/404), Response: {data}")
+        
+        # Test getting reviews for a user
+        success, data, status = self.make_request('GET', 'reviews/user/test_user_id')
+        self.log_test("Get user reviews", success and status == 200,
+                     f"Status: {status}, Count: {len(data) if isinstance(data, list) else 'N/A'}")
+
+    def test_collaboration_status_update(self):
+        """Test updating collaboration status to completed for review testing"""
+        print("\n🔍 Testing Collaboration Status Updates...")
+        
+        if not self.token:
+            self.log_test("Collaboration status test", False, "No auth token available")
+            return
+            
+        # Get my collaborations first
+        success, data, status = self.make_request('GET', 'collaborations/my')
+        if not success or not isinstance(data, list) or len(data) == 0:
+            self.log_test("Get collaborations for status update", False, "No collaborations found")
+            return
+            
+        # Try to update first collaboration to completed
+        collab_id = data[0].get('collab_id')
+        if collab_id:
+            success, response_data, status = self.make_request('PATCH', f'collaborations/{collab_id}/status', 
+                                                             {"status": "completed"})
+            self.log_test("Update collaboration to completed", success and status == 200,
+                         f"Status: {status}, Collab ID: {collab_id}")
+        else:
+            self.log_test("Update collaboration status", False, "No valid collaboration ID found")
+
     def run_all_tests(self):
         """Run all test suites"""
         print("🚀 Starting colaboreaza.ro API Tests...")
