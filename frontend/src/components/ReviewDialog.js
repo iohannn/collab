@@ -89,6 +89,16 @@ export const ReviewDialog = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          {/* Trust Message */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-start gap-2">
+            <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>
+              {language === 'ro' 
+                ? 'Recenzia ta va fi dezvăluită simultan cu cea a celeilalte părți, sau după 14 zile.'
+                : 'Your review will be revealed simultaneously with the other party\'s, or after 14 days.'}
+            </span>
+          </div>
+
           {/* Collaboration Info */}
           <div className="bg-muted/50 rounded-lg p-4">
             <p className="text-sm text-muted-foreground">{language === 'ro' ? 'Colaborare' : 'Collaboration'}</p>
