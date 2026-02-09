@@ -12,6 +12,7 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
+import { SocialPostsEditor } from '../components/SocialPosts';
 import {
   UserCircle, Edit2, Save, Instagram, Youtube, Music2,
   Briefcase, TrendingUp, Clock, CheckCircle, XCircle, ExternalLink, Star
@@ -48,6 +49,7 @@ const InfluencerDashboard = () => {
     instagram_url: '',
     tiktok_url: '',
     youtube_url: '',
+    featured_posts: [],
   });
 
   useEffect(() => {
@@ -86,6 +88,7 @@ const InfluencerDashboard = () => {
             instagram_url: profileData.instagram_url || '',
             tiktok_url: profileData.tiktok_url || '',
             youtube_url: profileData.youtube_url || '',
+            featured_posts: profileData.featured_posts || [],
           });
         }
       }
