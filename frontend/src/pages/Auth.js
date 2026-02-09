@@ -142,6 +142,7 @@ export const Register = () => {
   const [loading, setLoading] = useState(false);
   const [userType, setUserType] = useState(searchParams.get('type') || 'influencer');
   const [form, setForm] = useState({ email: '', password: '', name: '' });
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -149,7 +150,7 @@ export const Register = () => {
     try {
       await register(form.email, form.password, form.name, userType);
       toast.success('Cont creat cu succes!');
-      navigate('/dashboard');
+      navigate(redirectTo);
     } catch (error) {
       toast.error(error.message || 'Înregistrarea a eșuat');
     } finally {
