@@ -501,6 +501,20 @@ const BrandDashboard = () => {
                         fetchApplications(collab.collab_id);
                       }}
                     />
+                    {/* Payment Status Badge */}
+                    {collab.collaboration_type === 'paid' && (
+                      <div className="absolute top-4 left-4 z-10">
+                        {collab.payment_status === 'secured' ? (
+                          <Badge className="bg-green-100 text-green-700 gap-1" data-testid={`escrow-secured-${collab.collab_id}`}>
+                            <Shield className="w-3 h-3" /> Fonduri securizate
+                          </Badge>
+                        ) : collab.payment_status === 'awaiting_escrow' ? (
+                          <Badge className="bg-amber-100 text-amber-700 gap-1" data-testid={`escrow-awaiting-${collab.collab_id}`}>
+                            <AlertCircle className="w-3 h-3" /> Necesită securizare
+                          </Badge>
+                        ) : null}
+                      </div>
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -513,6 +527,12 @@ const BrandDashboard = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
+                        {collab.collaboration_type === 'paid' && collab.payment_status === 'awaiting_escrow' && (
+                          <DropdownMenuItem onClick={() => handleSecurePayment(collab)}>
+                            <Lock className="w-4 h-4 mr-2" />
+                            Securizează fonduri
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleStatusChange(collab.collab_id, 'closed')}>
                           <XCircle className="w-4 h-4 mr-2" />
                           Închide colaborarea
