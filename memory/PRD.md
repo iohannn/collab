@@ -4,7 +4,8 @@
 **Product Name:** colaboreaza.ro  
 **Type:** Reverse Influencer Marketplace MVP  
 **Date Created:** 2026-02-05  
-**Status:** MVP Complete
+**Last Updated:** 2026-02-09  
+**Status:** MVP Complete + Phase 2 Features
 
 ---
 
@@ -35,6 +36,11 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 - Looking for paid brand collaborations
 - Want transparent pricing and quick deals
 
+### Admin Users
+- Platform moderators
+- User management and support
+- Report handling
+
 ---
 
 ## Core Requirements
@@ -44,6 +50,7 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 - [x] Google OAuth via Emergent Auth
 - [x] JWT tokens for session management
 - [x] Protected routes for dashboards
+- [x] Admin role support
 
 ### Brand Features
 - [x] Create collaborations with full details
@@ -52,6 +59,7 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 - [x] View and manage applicants
 - [x] Accept/reject applications
 - [x] Track active/closed/completed collaborations
+- [x] Analytics dashboard (PRO)
 
 ### Influencer Features
 - [x] Create and edit public profile
@@ -60,6 +68,7 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 - [x] Browse public collaborations
 - [x] Apply to collaborations
 - [x] Track application status
+- [x] Analytics dashboard (PRO)
 
 ### Public Features
 - [x] View collaborations without login (FOMO)
@@ -67,6 +76,7 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 - [x] Countdown timers on collaborations
 - [x] Applicant count display
 - [x] Platform filtering
+- [x] Full-text search (title, brand, description, deliverables)
 
 ### Monetization
 - [x] Stripe integration in test mode
@@ -74,64 +84,46 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 - [x] Featured placement for influencers (€9/week)
 - [x] Payment status polling
 
+### Admin Features (NEW)
+- [x] Admin dashboard with platform stats
+- [x] User management (search, filter, ban, give PRO)
+- [x] Collaboration moderation (view, delete)
+- [x] Report handling system (dismiss, warn, ban)
+
+### Email Notifications (NEW)
+- [x] SMTP-based email service (cPanel compatible)
+- [x] New application notification to brands
+- [x] Application status change notification to influencers
+- [x] Configurable via environment variables
+
+### Analytics (NEW)
+- [x] PRO-only feature with upgrade prompt
+- [x] Brand analytics: views, applicants, conversion rate
+- [x] Influencer analytics: success rate, profile views, earnings
+- [x] Platform breakdown charts
+- [x] Monthly trend visualization
+- [x] Application status breakdown
+
 ---
 
-## What's Been Implemented (2026-02-05)
+## What's Been Implemented
 
-### Backend (FastAPI + MongoDB)
+### Phase 1 (2026-02-05)
 - Complete REST API with 15+ endpoints
-- JWT authentication + Google OAuth session handling
+- JWT authentication + Google OAuth
 - User, Collaboration, Application, Payment models
 - Stripe checkout integration
-- Public stats endpoint
-
-### Frontend (React)
-- Landing page with stats, CTA, brand marquee
-- Login/Register pages with Google OAuth
-- Brand Dashboard with collaboration management
-- Influencer Dashboard with profile editor
-- Public collaboration listings with filters
-- Collaboration detail page with apply modal
-- Public influencer profiles
-- Pricing page with Stripe checkout
+- Landing page, Auth pages, Dashboards
+- Public profiles and collaboration listings
 - Romanian/English language switcher
-- Responsive design with Outfit/Satoshi fonts
-- Electric Orange (#FF4F00) as primary color
 
-### Design
-- Light theme with high-contrast elements
-- Ticket-style collaboration cards
-- Countdown timers with urgency styling
-- Brand marquee animation
-- Glass morphism header
-- Clean dashboard layouts
-
----
-
-## Prioritized Backlog
-
-### P0 - Critical (Next Sprint)
-- [ ] Email notifications for applications
-- [ ] Admin panel for moderation
-- [ ] Report user functionality
-
-### P1 - High Priority
-- [ ] Collaboration search by keyword
-- [ ] Influencer verification badges
-- [ ] Application messaging/chat
-- [ ] Analytics dashboard for PRO users
-
-### P2 - Medium Priority  
-- [ ] Social media verification (connect accounts)
-- [ ] Portfolio/media uploads
-- [ ] Review/rating system
-- [ ] Saved collaborations
-
-### P3 - Nice to Have
-- [ ] Mobile app (React Native)
-- [ ] Collaboration templates
-- [ ] Bulk application management
-- [ ] Export data features
+### Phase 2 (2026-02-09)
+- Full-text search on collaborations
+- Admin panel with moderation tools
+- Analytics dashboard for PRO users
+- Email notification system (SMTP)
+- Report user functionality
+- View tracking on collaborations
 
 ---
 
@@ -144,12 +136,14 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 | Database | MongoDB |
 | Auth | JWT + Emergent Google OAuth |
 | Payments | Stripe (test mode) |
+| Email | SMTP (cPanel compatible) |
 | Hosting | Kubernetes (Emergent) |
 
 ---
 
 ## API Endpoints Summary
 
+### Authentication
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | /api/auth/register | Register new user |
@@ -157,29 +151,117 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 | POST | /api/auth/session | Exchange Google OAuth session |
 | GET | /api/auth/me | Get current user |
 | POST | /api/auth/logout | Logout |
+
+### Profiles
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET/POST | /api/brands/profile | Brand profile |
 | GET/POST | /api/influencers/profile | Influencer profile |
 | GET | /api/influencers/{username} | Public profile |
 | GET | /api/influencers | List influencers |
+
+### Collaborations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | POST | /api/collaborations | Create collaboration |
-| GET | /api/collaborations | List public collaborations |
+| GET | /api/collaborations | List (with search) |
 | GET | /api/collaborations/my | User's collaborations |
 | GET | /api/collaborations/{id} | Single collaboration |
 | PATCH | /api/collaborations/{id}/status | Update status |
+
+### Applications
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | POST | /api/applications | Apply to collaboration |
 | GET | /api/applications/my | My applications |
 | GET | /api/applications/collab/{id} | Collaboration applications |
 | PATCH | /api/applications/{id}/status | Accept/reject |
+
+### Payments
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | POST | /api/payments/checkout | Create Stripe checkout |
 | GET | /api/payments/status/{id} | Check payment status |
+
+### Admin (NEW)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/admin/stats | Platform statistics |
+| GET | /api/admin/users | List all users |
+| PATCH | /api/admin/users/{id} | Update user |
+| GET | /api/admin/collaborations | List all collaborations |
+| DELETE | /api/admin/collaborations/{id} | Delete collaboration |
+| GET | /api/admin/reports | List reports |
+| PATCH | /api/admin/reports/{id} | Resolve report |
+
+### Analytics (NEW)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/analytics/brand | Brand analytics (PRO) |
+| GET | /api/analytics/influencer | Influencer analytics (PRO) |
+
+### Other
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/reports | Report a user |
 | GET | /api/stats/public | Public stats |
+
+---
+
+## Environment Configuration
+
+```env
+# Database
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=test_database
+
+# Auth
+JWT_SECRET=your-secret-key
+ADMIN_EMAILS=admin@colaboreaza.ro
+
+# Payments
+STRIPE_API_KEY=sk_test_xxx
+
+# Email (cPanel SMTP)
+SMTP_HOST=localhost
+SMTP_PORT=587
+SMTP_USER=your-email@domain.com
+SMTP_PASSWORD=your-password
+SMTP_FROM_EMAIL=noreply@colaboreaza.ro
+SMTP_FROM_NAME=colaboreaza.ro
+EMAIL_ENABLED=true
+```
+
+---
+
+## Prioritized Backlog
+
+### P0 - Next Sprint
+- [ ] Social media verification (connect accounts)
+- [ ] Direct messaging between brands and influencers
+- [ ] Webhook for real-time payment updates
+
+### P1 - High Priority
+- [ ] Advanced filtering (budget range, audience size)
+- [ ] Saved collaborations/bookmarks
+- [ ] Export data to CSV
+
+### P2 - Medium Priority
+- [ ] Portfolio/media uploads
+- [ ] Review/rating system after collaboration
+- [ ] Campaign templates for brands
+
+### P3 - Nice to Have
+- [ ] Mobile app (React Native)
+- [ ] AI-powered matching suggestions
+- [ ] Bulk collaboration management
 
 ---
 
 ## Next Actions
 
-1. **Add email notifications** - Alert brands when they receive applications
-2. **Implement admin panel** - For moderation and user management
-3. **Add search functionality** - Full-text search for collaborations
-4. **Improve onboarding** - Guide new users through profile setup
-5. **Add analytics** - Track views, applications, conversion rates
+1. **Enable email notifications** - Configure SMTP settings in .env for cPanel
+2. **Add social verification** - Allow influencers to verify their social accounts
+3. **Direct messaging** - Enable communication between brands and influencers
+4. **Advanced filters** - Budget range slider, audience size filters
+5. **Webhook integration** - Real-time payment status updates
