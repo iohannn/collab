@@ -566,9 +566,9 @@ async def get_public_influencer_profile(username: str):
     
     user = await db.users.find_one({'user_id': profile['user_id']}, {'_id': 0, 'password_hash': 0})
     
-    # Get recent reviews
+    # Get recent revealed reviews only
     reviews = await db.reviews.find(
-        {'reviewed_user_id': profile['user_id'], 'reviewer_type': 'brand'},
+        {'reviewed_user_id': profile['user_id'], 'reviewer_type': 'brand', 'is_revealed': True},
         {'_id': 0}
     ).sort('created_at', -1).limit(5).to_list(5)
     
