@@ -49,6 +49,9 @@ const BrandDashboard = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedCollab, setSelectedCollab] = useState(null);
   const [applications, setApplications] = useState([]);
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [actionCollab, setActionCollab] = useState(null);
   const [appsLoading, setAppsLoading] = useState(false);
 
   // Form state
