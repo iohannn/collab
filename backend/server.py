@@ -802,7 +802,497 @@ async def update_collaboration_status(collab_id: str, request: Request):
     await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {'status': new_status}})
     return {'success': True}
 
-# ============ ESCROW PAYMENT ENDPOINTS ============
+# ============ CANCELLATION ENDPOINTS ============
+
+CANCELLATION_REASONS = [
+    'brand_changed_requirements',
+    'influencer_unavailable',
+    'budget_issues',
+    'timeline_conflict',
+    'quality_concerns',
+    'mutual_agreement',
+    'other'
+]
+
+@api_router.post("/collaborations/{collab_id}/cancel")
+async def cancel_collaboration(collab_id: str, request: Request):
+    """Cancel a collaboration (before delivery). Rules depend on escrow state."""
+    user = await require_auth(request)
+    body = await request.json()
+    reason = body.get('reason', '')
+    details = body.get('details', '')
+    
+    collab = await db.collaborations.find_one({'collab_id': collab_id})
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+    
+    is_brand = collab['brand_user_id'] == user['user_id']
+    # Check if user is an accepted influencer for this collab
+    is_influencer = False
+    if not is_brand:
+        inf_app = await db.applications.find_one({
+            'collab_id': collab_id,
+            'influencer_user_id': user['user_id'],
+            'status': 'accepted'
+        })
+        is_influencer = bool(inf_app)
+    
+    if not is_brand and not is_influencer:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    current_status = collab.get('status', '')
+    payment_status = collab.get('payment_status', 'none')
+    
+    # Block cancellation after delivery / completed_pending_release / disputed
+    blocked_statuses = ['completed_pending_release', 'completed', 'disputed', 'cancelled']
+    if current_status in blocked_statuses:
+        raise HTTPException(status_code=400, detail="Anularea nu mai este posibilă în această etapă. Folosiți sistemul de dispute.")
+    
+    # Scenario 1: Before work starts (status=active, payment_status=secured or awaiting_escrow)
+    if current_status == 'active' and payment_status in ('secured', 'awaiting_escrow', 'none'):
+        # Direct cancellation with full refund
+        now = datetime.now(timezone.utc).isoformat()
+        
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': 'cancelled',
+            'payment_status': 'refunded' if payment_status == 'secured' else 'none',
+            'cancelled_at': now,
+            'cancelled_by': user['user_id'],
+            'cancellation_reason': reason
+        }})
+        
+        # Refund escrow if secured
+        if payment_status == 'secured':
+            await db.escrow_payments.update_one(
+                {'collab_id': collab_id, 'status': 'secured'},
+                {'$set': {'status': 'refunded', 'refunded_at': now}}
+            )
+        
+        # Log cancellation
+        await db.cancellations.insert_one({
+            'cancellation_id': f"cancel_{uuid.uuid4().hex[:12]}",
+            'collab_id': collab_id,
+            'requested_by': user['user_id'],
+            'requester_type': 'brand' if is_brand else 'influencer',
+            'reason': reason,
+            'details': details,
+            'status': 'completed',
+            'resolution': 'full_refund' if payment_status == 'secured' else 'no_payment',
+            'created_at': now,
+            'resolved_at': now
+        })
+        
+        return {'success': True, 'status': 'cancelled', 'message': 'Colaborare anulată cu succes.'}
+    
+    # Scenario 2: After work started (status=in_progress)
+    if current_status == 'in_progress':
+        requester_type = 'brand' if is_brand else 'influencer'
+        cancel_status = f"cancellation_requested_by_{requester_type}"
+        now = datetime.now(timezone.utc).isoformat()
+        
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': cancel_status,
+        }})
+        
+        await db.cancellations.insert_one({
+            'cancellation_id': f"cancel_{uuid.uuid4().hex[:12]}",
+            'collab_id': collab_id,
+            'requested_by': user['user_id'],
+            'requester_type': requester_type,
+            'reason': reason,
+            'details': details,
+            'status': 'pending_admin_review',
+            'created_at': now
+        })
+        
+        return {'success': True, 'status': cancel_status, 'message': 'Cerere de anulare trimisă. Un admin va analiza situația.'}
+    
+    raise HTTPException(status_code=400, detail="Anularea nu este posibilă în starea curentă")
+
+@api_router.get("/cancellations/collab/{collab_id}")
+async def get_cancellation_for_collab(collab_id: str, request: Request):
+    """Get cancellation request for a collaboration"""
+    user = await require_auth(request)
+    cancellation = await db.cancellations.find_one(
+        {'collab_id': collab_id},
+        {'_id': 0}
+    )
+    return cancellation
+
+@api_router.get("/admin/cancellations")
+async def get_admin_cancellations(request: Request, limit: int = 50, skip: int = 0):
+    """List all cancellation requests (admin only)"""
+    await require_admin(request)
+    cancellations = await db.cancellations.find(
+        {}, {'_id': 0}
+    ).sort('created_at', -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Enrich with collab info
+    for c in cancellations:
+        collab = await db.collaborations.find_one({'collab_id': c['collab_id']}, {'_id': 0, 'title': 1, 'brand_name': 1, 'budget_min': 1})
+        c['collaboration'] = collab
+    
+    total = await db.cancellations.count_documents({})
+    return {'cancellations': cancellations, 'total': total}
+
+@api_router.patch("/admin/cancellations/{cancellation_id}/resolve")
+async def resolve_cancellation(cancellation_id: str, request: Request):
+    """Admin resolves a cancellation request"""
+    await require_admin(request)
+    body = await request.json()
+    resolution = body.get('resolution')  # 'full_refund', 'partial_refund', 'continue'
+    admin_notes = body.get('admin_notes', '')
+    partial_amount = body.get('partial_amount', 0)
+    
+    cancellation = await db.cancellations.find_one({'cancellation_id': cancellation_id})
+    if not cancellation:
+        raise HTTPException(status_code=404, detail="Cancellation not found")
+    if cancellation['status'] != 'pending_admin_review':
+        raise HTTPException(status_code=400, detail="Already resolved")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    collab_id = cancellation['collab_id']
+    
+    if resolution == 'full_refund':
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': 'cancelled',
+            'payment_status': 'refunded',
+            'cancelled_at': now
+        }})
+        await db.escrow_payments.update_one(
+            {'collab_id': collab_id, 'status': {'$in': ['secured', 'completed_pending_release']}},
+            {'$set': {'status': 'refunded', 'refunded_at': now}}
+        )
+    elif resolution == 'partial_refund':
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': 'cancelled',
+            'payment_status': 'partial_refund',
+            'cancelled_at': now
+        }})
+        escrow = await db.escrow_payments.find_one({'collab_id': collab_id, 'status': {'$in': ['secured', 'completed_pending_release']}})
+        if escrow:
+            await db.escrow_payments.update_one({'escrow_id': escrow['escrow_id']}, {'$set': {
+                'status': 'partial_refund',
+                'partial_refund_amount': partial_amount,
+                'refunded_at': now
+            }})
+    elif resolution == 'continue':
+        # Restore to in_progress
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': 'in_progress'
+        }})
+    
+    await db.cancellations.update_one({'cancellation_id': cancellation_id}, {'$set': {
+        'status': 'resolved',
+        'resolution': resolution,
+        'admin_notes': admin_notes,
+        'partial_amount': partial_amount if resolution == 'partial_refund' else None,
+        'resolved_at': now
+    }})
+    
+    return {'success': True, 'resolution': resolution}
+
+# ============ DISPUTE ENDPOINTS ============
+
+@api_router.post("/disputes/create/{collab_id}")
+async def create_dispute(collab_id: str, request: Request):
+    """Create a dispute (only for completed_pending_release collaborations)"""
+    user = await require_auth(request)
+    body = await request.json()
+    reason = body.get('reason', '')
+    details = body.get('details', '')
+    
+    collab = await db.collaborations.find_one({'collab_id': collab_id})
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+    
+    if collab['status'] != 'completed_pending_release':
+        raise HTTPException(status_code=400, detail="Disputele sunt posibile doar în faza de verificare a livrării (completed_pending_release)")
+    
+    # Verify user is participant
+    is_brand = collab['brand_user_id'] == user['user_id']
+    is_influencer = False
+    if not is_brand:
+        inf_app = await db.applications.find_one({
+            'collab_id': collab_id,
+            'influencer_user_id': user['user_id'],
+            'status': 'accepted'
+        })
+        is_influencer = bool(inf_app)
+    
+    if not is_brand and not is_influencer:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Check no existing active dispute
+    existing = await db.disputes.find_one({'collab_id': collab_id, 'status': {'$in': ['open', 'under_review']}})
+    if existing:
+        raise HTTPException(status_code=400, detail="O dispută este deja deschisă pentru această colaborare")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    dispute_id = f"dispute_{uuid.uuid4().hex[:12]}"
+    
+    dispute_doc = {
+        'dispute_id': dispute_id,
+        'collab_id': collab_id,
+        'opened_by': user['user_id'],
+        'opener_type': 'brand' if is_brand else 'influencer',
+        'opener_name': user['name'],
+        'reason': reason,
+        'details': details,
+        'status': 'open',
+        'created_at': now,
+        'brand_user_id': collab['brand_user_id'],
+    }
+    
+    # Find influencer
+    inf_app = await db.applications.find_one({'collab_id': collab_id, 'status': 'accepted'})
+    if inf_app:
+        dispute_doc['influencer_user_id'] = inf_app['influencer_user_id']
+    
+    await db.disputes.insert_one(dispute_doc)
+    
+    # Update collaboration and escrow status to disputed
+    await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+        'status': 'disputed',
+        'payment_status': 'disputed',
+        'disputed_at': now
+    }})
+    await db.escrow_payments.update_one(
+        {'collab_id': collab_id, 'status': 'completed_pending_release'},
+        {'$set': {'status': 'disputed', 'disputed_at': now}}
+    )
+    
+    # Lock messaging
+    await db.messages.update_many(
+        {'collab_id': collab_id},
+        {'$set': {'thread_locked': True}}
+    )
+    
+    clean = {k: v for k, v in dispute_doc.items() if k != '_id'}
+    return clean
+
+@api_router.get("/disputes/collab/{collab_id}")
+async def get_dispute_for_collab(collab_id: str, request: Request):
+    """Get dispute details for a collaboration"""
+    user = await require_auth(request)
+    dispute = await db.disputes.find_one(
+        {'collab_id': collab_id, 'status': {'$in': ['open', 'under_review']}},
+        {'_id': 0}
+    )
+    return dispute
+
+@api_router.get("/admin/disputes")
+async def get_admin_disputes(request: Request, status: str = None, limit: int = 50, skip: int = 0):
+    """List all disputes (admin only)"""
+    await require_admin(request)
+    query = {}
+    if status:
+        query['status'] = status
+    
+    disputes = await db.disputes.find(query, {'_id': 0}).sort('created_at', -1).skip(skip).limit(limit).to_list(limit)
+    
+    for d in disputes:
+        collab = await db.collaborations.find_one({'collab_id': d['collab_id']}, {'_id': 0, 'title': 1, 'brand_name': 1, 'budget_min': 1, 'budget_max': 1})
+        d['collaboration'] = collab
+        escrow = await db.escrow_payments.find_one({'collab_id': d['collab_id']}, {'_id': 0, 'total_amount': 1, 'influencer_payout': 1, 'platform_commission': 1})
+        d['escrow'] = escrow
+        # Get message history for context
+        msgs = await db.messages.find({'collab_id': d['collab_id']}, {'_id': 0}).sort('created_at', 1).to_list(100)
+        d['message_history'] = msgs
+    
+    total = await db.disputes.count_documents(query)
+    return {'disputes': disputes, 'total': total}
+
+@api_router.patch("/admin/disputes/{dispute_id}/resolve")
+async def resolve_dispute(dispute_id: str, request: Request):
+    """Admin resolves a dispute"""
+    await require_admin(request)
+    body = await request.json()
+    resolution = body.get('resolution')  # 'release_to_influencer', 'refund_to_brand', 'split'
+    admin_notes = body.get('admin_notes', '')
+    split_influencer = body.get('split_influencer', 0)
+    split_brand = body.get('split_brand', 0)
+    
+    dispute = await db.disputes.find_one({'dispute_id': dispute_id})
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Dispute not found")
+    if dispute['status'] == 'resolved':
+        raise HTTPException(status_code=400, detail="Dispute already resolved")
+    
+    collab_id = dispute['collab_id']
+    now = datetime.now(timezone.utc).isoformat()
+    
+    escrow = await db.escrow_payments.find_one({'collab_id': collab_id, 'status': 'disputed'})
+    
+    if resolution == 'release_to_influencer':
+        # Release full amount to influencer
+        if escrow:
+            rate = escrow.get('commission_rate', await get_commission_rate())
+            # Create commission record
+            accepted_apps = await db.applications.find({'collab_id': collab_id, 'status': 'accepted'}, {'_id': 0}).to_list(10)
+            for app in accepted_apps:
+                proposed_price = app.get('proposed_price') or escrow.get('total_amount', 0)
+                commission = round(proposed_price * rate / 100, 2)
+                net_amount = round(proposed_price - commission, 2)
+                await db.commissions.insert_one({
+                    'commission_id': f"comm_{uuid.uuid4().hex[:12]}",
+                    'collab_id': collab_id,
+                    'application_id': app['application_id'],
+                    'brand_user_id': escrow['brand_user_id'],
+                    'influencer_user_id': app['influencer_user_id'],
+                    'gross_amount': proposed_price,
+                    'commission_rate': rate,
+                    'commission_amount': commission,
+                    'net_amount': net_amount,
+                    'status': 'completed',
+                    'created_at': now
+                })
+            
+            await db.escrow_payments.update_one({'escrow_id': escrow['escrow_id']}, {'$set': {
+                'status': 'released',
+                'released_at': now
+            }})
+        
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': 'completed',
+            'payment_status': 'released',
+            'released_at': now
+        }})
+    
+    elif resolution == 'refund_to_brand':
+        if escrow:
+            await db.escrow_payments.update_one({'escrow_id': escrow['escrow_id']}, {'$set': {
+                'status': 'refunded',
+                'refunded_at': now
+            }})
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': 'cancelled',
+            'payment_status': 'refunded',
+            'cancelled_at': now
+        }})
+    
+    elif resolution == 'split':
+        if escrow:
+            await db.escrow_payments.update_one({'escrow_id': escrow['escrow_id']}, {'$set': {
+                'status': 'split_resolved',
+                'split_influencer': split_influencer,
+                'split_brand': split_brand,
+                'resolved_at': now
+            }})
+        await db.collaborations.update_one({'collab_id': collab_id}, {'$set': {
+            'status': 'completed',
+            'payment_status': 'split_resolved',
+        }})
+    
+    await db.disputes.update_one({'dispute_id': dispute_id}, {'$set': {
+        'status': 'resolved',
+        'resolution': resolution,
+        'admin_notes': admin_notes,
+        'split_influencer': split_influencer if resolution == 'split' else None,
+        'split_brand': split_brand if resolution == 'split' else None,
+        'resolved_at': now
+    }})
+    
+    return {'success': True, 'resolution': resolution}
+
+# ============ MESSAGING ENDPOINTS ============
+
+@api_router.post("/messages/{collab_id}")
+async def send_message(collab_id: str, request: Request):
+    """Send a message in a collaboration thread"""
+    user = await require_auth(request)
+    body = await request.json()
+    content = body.get('content', '').strip()
+    
+    if not content:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    if len(content) > 2000:
+        raise HTTPException(status_code=400, detail="Mesajul nu poate depăși 2000 de caractere")
+    
+    collab = await db.collaborations.find_one({'collab_id': collab_id})
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+    
+    # Check if thread is locked (dispute)
+    if collab.get('status') == 'disputed':
+        raise HTTPException(status_code=400, detail="Mesajele sunt blocate pe durata disputei")
+    
+    # Verify user is participant
+    is_brand = collab['brand_user_id'] == user['user_id']
+    is_influencer = False
+    if not is_brand:
+        inf_app = await db.applications.find_one({
+            'collab_id': collab_id,
+            'influencer_user_id': user['user_id'],
+            'status': 'accepted'
+        })
+        is_influencer = bool(inf_app)
+    
+    if not is_brand and not is_influencer:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Collaboration must be active or in progress
+    allowed_statuses = ['active', 'in_progress', 'completed_pending_release', 'completed',
+                        'cancellation_requested_by_brand', 'cancellation_requested_by_influencer']
+    if collab['status'] not in allowed_statuses:
+        raise HTTPException(status_code=400, detail="Mesajele nu sunt disponibile în această etapă")
+    
+    # Check if there's an accepted application (messaging only after acceptance)
+    accepted_app = await db.applications.find_one({
+        'collab_id': collab_id,
+        'status': 'accepted'
+    })
+    if not accepted_app:
+        raise HTTPException(status_code=400, detail="Mesajele sunt disponibile doar după acceptarea unei aplicații")
+    
+    msg_id = f"msg_{uuid.uuid4().hex[:12]}"
+    msg_doc = {
+        'message_id': msg_id,
+        'collab_id': collab_id,
+        'sender_id': user['user_id'],
+        'sender_name': user['name'],
+        'sender_type': 'brand' if is_brand else 'influencer',
+        'content': content,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'thread_locked': False
+    }
+    
+    await db.messages.insert_one(msg_doc)
+    
+    clean = {k: v for k, v in msg_doc.items() if k != '_id'}
+    return clean
+
+@api_router.get("/messages/{collab_id}")
+async def get_messages(collab_id: str, request: Request, limit: int = 100, skip: int = 0):
+    """Get messages for a collaboration"""
+    user = await require_auth(request)
+    
+    collab = await db.collaborations.find_one({'collab_id': collab_id})
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+    
+    # Verify user is participant or admin
+    is_brand = collab['brand_user_id'] == user['user_id']
+    is_influencer = False
+    if not is_brand:
+        inf_app = await db.applications.find_one({
+            'collab_id': collab_id,
+            'influencer_user_id': user['user_id'],
+            'status': 'accepted'
+        })
+        is_influencer = bool(inf_app)
+    
+    if not is_brand and not is_influencer and not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    messages = await db.messages.find(
+        {'collab_id': collab_id},
+        {'_id': 0}
+    ).sort('created_at', 1).skip(skip).limit(limit).to_list(limit)
+    
+    is_locked = collab.get('status') == 'disputed'
+    
+    return {'messages': messages, 'is_locked': is_locked}
 
 REVIEW_REVEAL_TIMEOUT_DAYS = 14  # Days after release before reviews auto-reveal
 
