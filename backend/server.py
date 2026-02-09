@@ -668,6 +668,7 @@ async def create_collaboration(request: Request, data: CollaborationCreate):
             raise HTTPException(status_code=403, detail="Free users limited to 3 active collaborations. Upgrade to PRO!")
     
     collab_id = f"collab_{uuid.uuid4().hex[:12]}"
+    is_paid = data.collaboration_type == 'paid'
     collab_doc = {
         'collab_id': collab_id,
         'brand_user_id': user['user_id'],
@@ -684,7 +685,9 @@ async def create_collaboration(request: Request, data: CollaborationCreate):
         'applicants_count': 0,
         'views': 0,
         'created_at': datetime.now(timezone.utc).isoformat(),
-        'is_public': data.is_public
+        'is_public': data.is_public,
+        'collaboration_type': data.collaboration_type,
+        'payment_status': 'none' if not is_paid else 'awaiting_escrow',
     }
     
     await db.collaborations.insert_one(collab_doc)
