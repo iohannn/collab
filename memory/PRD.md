@@ -124,6 +124,15 @@ Build a web-based platform called "colaboreaza.ro" - a reverse influencer market
 - Email notification system (SMTP)
 - Report user functionality
 - View tracking on collaborations
+- **Review/Feedback System**
+  - Brands rate influencers after completed collaborations
+  - Influencers rate brands
+  - Star rating (1-5) with optional comment
+  - Average rating calculated and displayed on profiles
+- **Top 10 Influencers Leaderboard**
+  - Displayed on landing page
+  - Sorted by average rating
+  - Shows rank, rating, review count, price
 
 ---
 
