@@ -16,6 +16,8 @@ import CollaborationDetail from './pages/CollaborationDetail';
 import Influencers from './pages/Influencers';
 import PublicInfluencerProfile from './pages/PublicInfluencerProfile';
 import Pricing from './pages/Pricing';
+import AdminDashboard from './pages/AdminDashboard';
+import Analytics from './pages/Analytics';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
