@@ -333,6 +333,137 @@ class ColaboreazaAPITester:
         self.log_test("Create checkout session", success and status == 200,
                      f"Status: {status}, Has URL: {'url' in data}")
 
+    def test_search_functionality(self):
+        """Test full-text search functionality"""
+        print("\n🔍 Testing Search Functionality...")
+        
+        # Test search without query (should return all)
+        success, data, status = self.make_request('GET', 'collaborations?limit=5')
+        self.log_test("Collaborations without search", success and status == 200,
+                     f"Status: {status}, Count: {len(data) if isinstance(data, list) else 'N/A'}")
+        
+        # Test search with query
+        success, data, status = self.make_request('GET', 'collaborations?search=Instagram&limit=5')
+        self.log_test("Search collaborations (Instagram)", success and status == 200,
+                     f"Status: {status}, Count: {len(data) if isinstance(data, list) else 'N/A'}")
+        
+        # Test search with different terms
+        success, data, status = self.make_request('GET', 'collaborations?search=brand&limit=5')
+        self.log_test("Search collaborations (brand)", success and status == 200,
+                     f"Status: {status}, Count: {len(data) if isinstance(data, list) else 'N/A'}")
+        
+        # Test search with URL parameters
+        success, data, status = self.make_request('GET', 'collaborations?q=test&platform=instagram')
+        self.log_test("Search with URL parameters", success and status == 200,
+                     f"Status: {status}, Count: {len(data) if isinstance(data, list) else 'N/A'}")
+
+    def test_admin_endpoints(self):
+        """Test admin panel endpoints"""
+        print("\n🔍 Testing Admin Endpoints...")
+        
+        # Test with admin credentials
+        admin_success, admin_data, admin_status = self.make_request('POST', 'auth/login', {
+            "email": "admin@colaboreaza.ro",
+            "password": "admin123"
+        })
+        
+        if not admin_success or admin_status != 200:
+            self.log_test("Admin login", False, f"Status: {admin_status}, Response: {admin_data}")
+            return
+            
+        # Store original token and use admin token
+        original_token = self.token
+        self.token = admin_data.get('token')
+        
+        # Test admin stats
+        success, data, status = self.make_request('GET', 'admin/stats')
+        self.log_test("Admin stats", success and status == 200,
+                     f"Status: {status}, Users: {data.get('users', {}).get('total', 'N/A') if isinstance(data, dict) else 'N/A'}")
+        
+        # Test admin users list
+        success, data, status = self.make_request('GET', 'admin/users?limit=10')
+        self.log_test("Admin users list", success and status == 200,
+                     f"Status: {status}, Count: {len(data.get('users', [])) if isinstance(data, dict) else 'N/A'}")
+        
+        # Test admin users with search
+        success, data, status = self.make_request('GET', 'admin/users?search=test&limit=10')
+        self.log_test("Admin users search", success and status == 200,
+                     f"Status: {status}, Count: {len(data.get('users', [])) if isinstance(data, dict) else 'N/A'}")
+        
+        # Test admin users with filters
+        success, data, status = self.make_request('GET', 'admin/users?user_type=brand&limit=10')
+        self.log_test("Admin users filter", success and status == 200,
+                     f"Status: {status}, Count: {len(data.get('users', [])) if isinstance(data, dict) else 'N/A'}")
+        
+        # Test admin collaborations
+        success, data, status = self.make_request('GET', 'admin/collaborations?limit=10')
+        self.log_test("Admin collaborations list", success and status == 200,
+                     f"Status: {status}, Count: {len(data.get('collaborations', [])) if isinstance(data, dict) else 'N/A'}")
+        
+        # Test admin reports
+        success, data, status = self.make_request('GET', 'admin/reports?limit=10')
+        self.log_test("Admin reports list", success and status == 200,
+                     f"Status: {status}, Count: {len(data.get('reports', [])) if isinstance(data, dict) else 'N/A'}")
+        
+        # Restore original token
+        self.token = original_token
+
+    def test_analytics_endpoints(self):
+        """Test analytics endpoints (PRO feature)"""
+        print("\n🔍 Testing Analytics Endpoints...")
+        
+        # Test with regular PRO user
+        pro_success, pro_data, pro_status = self.make_request('POST', 'auth/login', {
+            "email": "test@test.com",
+            "password": "test123"
+        })
+        
+        if not pro_success or pro_status != 200:
+            self.log_test("PRO user login", False, f"Status: {pro_status}, Response: {pro_data}")
+            return
+            
+        # Store original token and use PRO token
+        original_token = self.token
+        self.token = pro_data.get('token')
+        
+        # Test brand analytics (assuming test@test.com is a brand)
+        success, data, status = self.make_request('GET', 'analytics/brand')
+        if status == 200:
+            self.log_test("Brand analytics (PRO)", True, f"Status: {status}, Overview: {data.get('overview', {}) if isinstance(data, dict) else 'N/A'}")
+        elif status == 403:
+            # Try influencer analytics instead
+            success, data, status = self.make_request('GET', 'analytics/influencer')
+            self.log_test("Influencer analytics (PRO)", success and status == 200,
+                         f"Status: {status}, Overview: {data.get('overview', {}) if isinstance(data, dict) else 'N/A'}")
+        else:
+            self.log_test("Analytics endpoints", False, f"Status: {status}, Response: {data}")
+        
+        # Restore original token
+        self.token = original_token
+        
+        # Test analytics without PRO (should fail)
+        if original_token:
+            success, data, status = self.make_request('GET', 'analytics/brand')
+            self.log_test("Analytics without PRO", status == 403,
+                         f"Status: {status} (should be 403), Response: {data}")
+
+    def test_non_admin_access(self):
+        """Test that non-admin users cannot access admin endpoints"""
+        print("\n🔍 Testing Non-Admin Access Restrictions...")
+        
+        if not self.token:
+            self.log_test("Non-admin access test", False, "No auth token available")
+            return
+            
+        # Test admin endpoints with regular user token (should fail)
+        success, data, status = self.make_request('GET', 'admin/stats')
+        self.log_test("Non-admin stats access", status == 403,
+                     f"Status: {status} (should be 403), Response: {data}")
+        
+        success, data, status = self.make_request('GET', 'admin/users')
+        self.log_test("Non-admin users access", status == 403,
+                     f"Status: {status} (should be 403), Response: {data}")
+
     def run_all_tests(self):
         """Run all test suites"""
         print("🚀 Starting colaboreaza.ro API Tests...")
