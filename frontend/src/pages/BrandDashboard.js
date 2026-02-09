@@ -552,13 +552,19 @@ const BrandDashboard = () => {
                             Securizează fonduri
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => handleStatusChange(collab.collab_id, 'closed')}>
-                          <XCircle className="w-4 h-4 mr-2" />
-                          Închide colaborarea
-                        </DropdownMenuItem>
+                        {collab.status === 'active' && collab.payment_status === 'secured' && (
+                          <DropdownMenuItem onClick={() => handleStatusChange(collab.collab_id, 'in_progress')}>
+                            <Play className="w-4 h-4 mr-2" />
+                            Marchează ca în lucru
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleStatusChange(collab.collab_id, 'completed')}>
                           <CheckCircle className="w-4 h-4 mr-2" />
                           Marchează ca finalizat
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setActionCollab(collab); setCancelOpen(true); }}>
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Anulează colaborarea
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
