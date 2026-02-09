@@ -46,6 +46,9 @@ EMAIL_ENABLED = os.environ.get('EMAIL_ENABLED', 'false').lower() == 'true'
 # Admin Config
 ADMIN_EMAILS = os.environ.get('ADMIN_EMAILS', '').split(',')
 
+# Commission Config (default 10%, stored in DB for admin configurability)
+DEFAULT_COMMISSION_RATE = 10.0
+
 app = FastAPI(title="colaboreaza.ro API")
 api_router = APIRouter(prefix="/api")
 
