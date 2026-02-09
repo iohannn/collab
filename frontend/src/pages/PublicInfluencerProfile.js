@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { ReviewsSection } from '../components/ReviewDialog';
+import { StarRating } from '../components/TopInfluencers';
 import {
   Instagram, Youtube, Music2, Users, TrendingUp, DollarSign,
-  ExternalLink, ArrowLeft, Share2, CheckCircle
+  ExternalLink, ArrowLeft, Share2, CheckCircle, Star
 } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
