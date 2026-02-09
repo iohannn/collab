@@ -94,6 +94,22 @@ const AppRouter = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
