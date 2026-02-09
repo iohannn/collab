@@ -10,99 +10,85 @@ Build a web-based platform called "colaboreaza.ro", a reverse influencer marketp
 - **Payments:** Escrow system (MOCK provider, ready for Netopia/Stripe Connect)
 
 ## User Roles
-- **Brand:** Create/manage collaborations, secure escrow payments, view applicants, review influencers
-- **Influencer:** Create public profile, browse/apply for collaborations, manage social posts, review brands
-- **Admin:** Moderate users/collaborations, manage commission rates, view reports, manage escrow
+- **Brand:** Create/manage collaborations, secure escrow payments, view applicants, review influencers, message creators
+- **Influencer:** Create public profile, browse/apply for collaborations, manage social posts, review brands, message brands
+- **Admin:** Moderate users/collaborations, manage commission rates, resolve disputes/cancellations
 
 ## Completed Features
 
-### Phase 1 - Core (Complete)
-- [x] JWT email/password authentication
-- [x] Google Social Login (Emergent-managed)
-- [x] Brand Dashboard (create/manage collaborations, view applicants)
-- [x] Influencer Dashboard (profile management, apply for collaborations)
+### Phase 1 - Core
+- [x] JWT email/password authentication + Google Social Login
+- [x] Brand & Influencer Dashboards
 - [x] Public collaboration board with search
 - [x] Public shareable influencer profiles
 - [x] Landing page with live stats
 - [x] Internationalization (RO/EN)
 
-### Phase 2 (Complete)
+### Phase 2
 - [x] Admin panel for moderation
-- [x] Full-text search for collaborations
-- [x] PRO Analytics dashboard (brand + influencer)
-- [x] SMTP Email notifications infrastructure (needs user SMTP credentials)
-- [x] Stripe payment integration (test mode) for PRO plans
+- [x] Full-text search
+- [x] PRO Analytics dashboard
+- [x] SMTP Email notifications infrastructure (needs SMTP credentials)
 
-### Phase 3 (Complete)
+### Phase 3
 - [x] Mutual feedback/rating system with simultaneous reveal
-- [x] "Top 10 Influencers" leaderboard based on ratings
+- [x] "Top 10 Influencers" leaderboard
 
-### Phase 4 (Complete)
-- [x] Social media post embedding (oEmbed for YouTube, TikTok, Instagram)
-- [x] SocialPostsEditor in influencer dashboard
-- [x] SocialPostsCarousel on public influencer profiles
-- [x] Automated commission system (configurable rate, default 10%)
-- [x] Admin commission management tab
+### Phase 4
+- [x] Social media post embedding (oEmbed)
+- [x] Automated commission system (configurable, default 10%)
 
-### Phase 5 - Escrow & Trust System (Complete - Feb 2025)
+### Phase 5 - Escrow & Trust System
 - [x] Escrow payment flow (create → secure → complete → release)
 - [x] Collaboration types: paid (escrow mandatory), barter, free
-- [x] Payment status tracking: awaiting_escrow → secured → completed_pending_release → released
-- [x] Confirmation window before fund release (completed_pending_release state)
-- [x] Escrow refund capability
-- [x] Commission auto-calculation on fund release
-- [x] Reviews gated behind payment release (paid collabs) or completion (free/barter)
-- [x] Mutual review reveal: hidden until both parties submit or 14-day timeout
-- [x] Trust UX: "Fonduri securizate", "Colaborare protejată", "Payout garantat"
-- [x] Brand dashboard tabs: Active, Eliberare, Finalizate, Închise
-- [x] Payment protection banners on collaboration detail pages
-- [x] Escrow status badges on collaboration cards
+- [x] Confirmation window (completed_pending_release)
+- [x] Reviews gated behind payment release
+- [x] Mutual review reveal (hidden until both submit or 14-day timeout)
+
+### Phase 6 - Cancellations, Disputes & Messaging
+- [x] Cancellation system (before work = instant refund, in_progress = admin review)
+- [x] Dispute system (only in completed_pending_release, blocks release, locks messaging)
+- [x] Collaboration-based messaging (text only, after acceptance)
+- [x] Admin dispute resolution (release/refund/split)
+- [x] Admin cancellation resolution (refund/partial/continue)
+
+### Phase 7 - Auth-Gated Collaboration Visibility
+- [x] Teaser + lock pattern on collaborations page (first 2 visible, rest locked)
+- [x] Collaboration detail teaser (budget, platform, countdown visible; description blurred)
+- [x] Auth CTA overlay with "Creează cont gratuit" / "Am deja un cont"
+- [x] Post-login redirect to exact collaboration via ?redirect= param
+- [x] Homepage and influencer profiles NOT gated
 
 ## Pending / Known Issues
-- Email notifications: Infrastructure ready, user needs to configure SMTP credentials (EMAIL_ENABLED=false)
-- Escrow payment provider: Currently MOCK - needs Netopia API keys for production
-- Frontend lint warnings (useEffect dependencies) - cosmetic only
+- Email notifications: needs SMTP credentials
+- Escrow payment provider: MOCK - needs Netopia API keys for production
 
 ## Backlog / Future Tasks
-- **P1: Netopia Payment Integration** - Replace mock provider with Netopia API for real payments (requires API keys)
-- **P2: Gamification Badges** - Award badges ("Top Rated", "Verified") to influencer profiles
-- **P2: Stripe Connect** - Future migration path for international payments
-- **P3: Dispute Resolution** - Workflow for handling payment disputes
-- **Refactoring:** Break down server.py monolith into modular structure
+- **P1: Netopia Payment Integration** - real payment processing
+- **P2: Gamification Badges** - "Top Rated", "Verified" badges
+- **P2: Stripe Connect** - international payments
+- **P3: Complex Dispute Workflow** - evidence upload, timeline
+- **Refactoring:** Modularize server.py
 
 ## Key API Endpoints
 - `/api/auth/{register, login, me, session, logout}`
-- `/api/collaborations` (CRUD, search, status management)
-- `/api/escrow/create/{collab_id}` - Create escrow for paid collaboration
-- `/api/escrow/{escrow_id}/secure` - Secure funds (mock/Netopia)
-- `/api/escrow/{escrow_id}/release` - Release funds after confirmation
-- `/api/escrow/{escrow_id}/refund` - Refund escrowed funds
-- `/api/escrow/collab/{collab_id}` - Get escrow status
-- `/api/applications` (create, list, status management)
-- `/api/influencers/{profile, top, list, {username}}`
-- `/api/reviews` (mutual reveal system)
-- `/api/admin/{stats, users, collaborations, reports, commissions}`
-- `/api/settings/commission` (GET/PUT, admin only)
+- `/api/collaborations` (CRUD, search, status, cancel)
+- `/api/escrow/{create, secure, release, refund, collab}`
+- `/api/disputes/{create, collab}`
+- `/api/messages/{collab_id}` (send, list)
+- `/api/applications`, `/api/influencers`, `/api/reviews`
+- `/api/admin/{stats, users, collaborations, reports, commissions, disputes, cancellations}`
+- `/api/settings/commission`
 
 ## DB Collections
-- users, influencer_profiles, brand_profiles, collaborations, applications
-- reviews (with is_revealed field), reports, payment_transactions, user_sessions
-- escrow_payments, commissions, settings
-
-## Escrow Flow
-```
-Brand creates paid collab → payment_status: awaiting_escrow
-Brand creates escrow → status: pending
-Brand secures funds → status: secured, collab payment_status: secured
-Brand marks completed → collab status: completed_pending_release (48h window)
-Brand releases funds → collab status: completed, payment_status: released
-Commission recorded → Reviews unlocked (mutual reveal)
-```
+users, influencer_profiles, brand_profiles, collaborations, applications,
+reviews, reports, payment_transactions, user_sessions,
+escrow_payments, commissions, settings, disputes, cancellations, messages
 
 ## Test Credentials
-- Brand: testbrand_new@test.com / TestPass123 (is_pro=true)
+- Brand: testbrand_new@test.com / TestPass123
 - Influencer: testinfluencer_new@test.com / TestPass123 (username: testcreator)
-- Admin: admin2@colaboreaza.ro / AdminPass123 (is_admin=true)
+- Admin: admin2@colaboreaza.ro / AdminPass123
 
 ## Test Reports
-- /app/test_reports/iteration_1.json through iteration_5.json
+- /app/test_reports/iteration_1.json through iteration_7.json
