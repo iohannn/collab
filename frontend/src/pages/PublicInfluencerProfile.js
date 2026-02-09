@@ -4,6 +4,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { ReviewsSection } from '../components/ReviewDialog';
 import { StarRating } from '../components/TopInfluencers';
+import { SocialPostsCarousel } from '../components/SocialPosts';
 import {
   Instagram, Youtube, Music2, Users, TrendingUp, DollarSign,
   ExternalLink, ArrowLeft, Share2, CheckCircle, Star
