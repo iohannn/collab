@@ -451,6 +451,29 @@ const InfluencerDashboard = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Featured Social Posts */}
+              {editing && (
+                <div className="mt-8 pt-8 border-t border-border">
+                  <SocialPostsEditor
+                    posts={form.featured_posts}
+                    onChange={(posts) => setForm({ ...form, featured_posts: posts })}
+                    maxPosts={6}
+                  />
+                </div>
+              )}
+              {!editing && profile?.featured_posts?.length > 0 && (
+                <div className="mt-8 pt-8 border-t border-border">
+                  <Label className="mb-3 block">Postări prezentate ({profile.featured_posts.length})</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {profile.featured_posts.map((url, index) => (
+                      <div key={index} className="bg-muted rounded-xl p-3 text-sm text-muted-foreground truncate">
+                        {url}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </TabsContent>
 
