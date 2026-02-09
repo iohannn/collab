@@ -184,6 +184,44 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleResolveDispute = async (disputeId, resolution, adminNotes = '', splitInfluencer = 0, splitBrand = 0) => {
+    try {
+      const response = await fetch(`${API}/admin/disputes/${disputeId}/resolve`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ resolution, admin_notes: adminNotes, split_influencer: splitInfluencer, split_brand: splitBrand }),
+      });
+      if (response.ok) {
+        toast.success('Dispută rezolvată');
+        fetchAdminData();
+      } else {
+        toast.error('Eroare la rezolvarea disputei');
+      }
+    } catch {
+      toast.error('Eroare de conexiune');
+    }
+  };
+
+  const handleResolveCancellation = async (cancellationId, resolution, adminNotes = '', partialAmount = 0) => {
+    try {
+      const response = await fetch(`${API}/admin/cancellations/${cancellationId}/resolve`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ resolution, admin_notes: adminNotes, partial_amount: partialAmount }),
+      });
+      if (response.ok) {
+        toast.success('Cerere de anulare rezolvată');
+        fetchAdminData();
+      } else {
+        toast.error('Eroare la rezolvare');
+      }
+    } catch {
+      toast.error('Eroare de conexiune');
+    }
+  };
+
   const filteredUsers = users.filter((u) => {
     const matchesSearch = search
       ? u.name?.toLowerCase().includes(search.toLowerCase()) ||
