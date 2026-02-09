@@ -58,7 +58,9 @@ export const ReviewDialog = ({
         throw new Error(error.detail || 'Failed to submit review');
       }
 
-      toast.success(language === 'ro' ? 'Recenzie trimisă!' : 'Review submitted!');
+      toast.success(language === 'ro' 
+        ? 'Recenzie trimisă! Va fi vizibilă când ambele părți vor trimite recenzia.' 
+        : 'Review submitted! It will be visible when both parties submit their review.');
       onOpenChange(false);
       onReviewSubmitted?.();
       setRating(0);
