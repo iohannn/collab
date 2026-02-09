@@ -20,7 +20,7 @@ import {
 import { toast } from 'sonner';
 import {
   ArrowLeft, Instagram, Youtube, Music2, Users, Calendar, DollarSign,
-  Clock, CheckCircle, Send
+  Clock, CheckCircle, Send, Shield
 } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
