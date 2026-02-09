@@ -1288,26 +1288,35 @@ async def get_application_reviews(application_id: str, request: Request):
 
 @api_router.get("/reviews/pending")
 async def get_pending_reviews(request: Request):
-    """Get collaborations pending review for current user"""
+    """Get collaborations pending review for current user (respects escrow rules)"""
     user = await require_auth(request)
     
     pending = []
+    
+    def can_review(collab):
+        """Check if collaboration is review-eligible"""
+        is_paid = collab.get('collaboration_type', 'paid') == 'paid'
+        if is_paid:
+            return collab.get('payment_status') == 'released'
+        else:
+            return collab.get('status') in ('completed', 'completed_pending_release')
     
     # For brands - get completed collaborations with accepted applications
     if user.get('user_type') == 'brand':
         collabs = await db.collaborations.find({
             'brand_user_id': user['user_id'],
-            'status': 'completed'
+            'status': {'$in': ['completed', 'completed_pending_release']}
         }, {'_id': 0}).to_list(100)
         
         for collab in collabs:
+            if not can_review(collab):
+                continue
             apps = await db.applications.find({
                 'collab_id': collab['collab_id'],
                 'status': 'accepted'
             }, {'_id': 0}).to_list(100)
             
             for app in apps:
-                # Check if already reviewed
                 existing = await db.reviews.find_one({
                     'application_id': app['application_id'],
                     'reviewer_user_id': user['user_id']
@@ -1327,10 +1336,10 @@ async def get_pending_reviews(request: Request):
         for app in apps:
             collab = await db.collaborations.find_one({
                 'collab_id': app['collab_id'],
-                'status': 'completed'
+                'status': {'$in': ['completed', 'completed_pending_release']}
             }, {'_id': 0})
             
-            if collab:
+            if collab and can_review(collab):
                 existing = await db.reviews.find_one({
                     'application_id': app['application_id'],
                     'reviewer_user_id': user['user_id']
