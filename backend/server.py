@@ -795,6 +795,198 @@ async def update_application_status(application_id: str, request: Request):
     
     return {'success': True}
 
+# ============ REVIEW ENDPOINTS ============
+
+@api_router.post("/reviews")
+async def create_review(request: Request, data: ReviewCreate):
+    """Create a review for a completed collaboration"""
+    user = await require_auth(request)
+    
+    # Get the application
+    app = await db.applications.find_one({'application_id': data.application_id})
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Application must be accepted
+    if app['status'] != 'accepted':
+        raise HTTPException(status_code=400, detail="Can only review accepted collaborations")
+    
+    # Get the collaboration
+    collab = await db.collaborations.find_one({'collab_id': app['collab_id']})
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+    
+    # Collaboration must be completed
+    if collab['status'] != 'completed':
+        raise HTTPException(status_code=400, detail="Collaboration must be completed before reviewing")
+    
+    # Determine reviewer type and reviewed user
+    is_brand = collab['brand_user_id'] == user['user_id']
+    is_influencer = app['influencer_user_id'] == user['user_id']
+    
+    if not is_brand and not is_influencer:
+        raise HTTPException(status_code=403, detail="Not authorized to review this collaboration")
+    
+    reviewer_type = 'brand' if is_brand else 'influencer'
+    reviewed_user_id = app['influencer_user_id'] if is_brand else collab['brand_user_id']
+    
+    # Check if already reviewed
+    existing = await db.reviews.find_one({
+        'application_id': data.application_id,
+        'reviewer_user_id': user['user_id']
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Already reviewed this collaboration")
+    
+    review_id = f"review_{uuid.uuid4().hex[:12]}"
+    review_doc = {
+        'review_id': review_id,
+        'application_id': data.application_id,
+        'collab_id': collab['collab_id'],
+        'reviewer_user_id': user['user_id'],
+        'reviewer_name': user['name'],
+        'reviewer_type': reviewer_type,
+        'reviewed_user_id': reviewed_user_id,
+        'rating': data.rating,
+        'comment': data.comment,
+        'collab_title': collab['title'],
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.reviews.insert_one(review_doc)
+    
+    # Update influencer's average rating if reviewed by brand
+    if is_brand:
+        await update_influencer_rating(app['influencer_user_id'])
+    
+    clean_review = {k: v for k, v in review_doc.items() if k != '_id'}
+    return clean_review
+
+async def update_influencer_rating(user_id: str):
+    """Calculate and update influencer's average rating"""
+    pipeline = [
+        {'$match': {'reviewed_user_id': user_id, 'reviewer_type': 'brand'}},
+        {'$group': {'_id': None, 'avg_rating': {'$avg': '$rating'}, 'count': {'$sum': 1}}}
+    ]
+    result = await db.reviews.aggregate(pipeline).to_list(1)
+    
+    if result:
+        avg_rating = round(result[0]['avg_rating'], 1)
+        review_count = result[0]['count']
+        await db.influencer_profiles.update_one(
+            {'user_id': user_id},
+            {'$set': {'avg_rating': avg_rating, 'review_count': review_count}}
+        )
+
+@api_router.get("/reviews/user/{user_id}")
+async def get_user_reviews(user_id: str, limit: int = 20, skip: int = 0):
+    """Get reviews for a user (as the reviewed party)"""
+    reviews = await db.reviews.find(
+        {'reviewed_user_id': user_id},
+        {'_id': 0}
+    ).sort('created_at', -1).skip(skip).limit(limit).to_list(limit)
+    
+    return reviews
+
+@api_router.get("/reviews/application/{application_id}")
+async def get_application_reviews(application_id: str, request: Request):
+    """Get reviews for a specific application"""
+    user = await require_auth(request)
+    
+    app = await db.applications.find_one({'application_id': application_id})
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    collab = await db.collaborations.find_one({'collab_id': app['collab_id']})
+    
+    # Only brand or influencer involved can see reviews
+    if user['user_id'] != collab['brand_user_id'] and user['user_id'] != app['influencer_user_id']:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    reviews = await db.reviews.find({'application_id': application_id}, {'_id': 0}).to_list(2)
+    
+    # Check if current user has already reviewed
+    user_reviewed = any(r['reviewer_user_id'] == user['user_id'] for r in reviews)
+    
+    return {
+        'reviews': reviews,
+        'user_reviewed': user_reviewed,
+        'can_review': collab['status'] == 'completed' and app['status'] == 'accepted' and not user_reviewed
+    }
+
+@api_router.get("/reviews/pending")
+async def get_pending_reviews(request: Request):
+    """Get collaborations pending review for current user"""
+    user = await require_auth(request)
+    
+    pending = []
+    
+    # For brands - get completed collaborations with accepted applications
+    if user.get('user_type') == 'brand':
+        collabs = await db.collaborations.find({
+            'brand_user_id': user['user_id'],
+            'status': 'completed'
+        }, {'_id': 0}).to_list(100)
+        
+        for collab in collabs:
+            apps = await db.applications.find({
+                'collab_id': collab['collab_id'],
+                'status': 'accepted'
+            }, {'_id': 0}).to_list(100)
+            
+            for app in apps:
+                # Check if already reviewed
+                existing = await db.reviews.find_one({
+                    'application_id': app['application_id'],
+                    'reviewer_user_id': user['user_id']
+                })
+                if not existing:
+                    pending.append({
+                        'application': app,
+                        'collaboration': collab
+                    })
+    else:
+        # For influencers - get accepted applications for completed collaborations
+        apps = await db.applications.find({
+            'influencer_user_id': user['user_id'],
+            'status': 'accepted'
+        }, {'_id': 0}).to_list(100)
+        
+        for app in apps:
+            collab = await db.collaborations.find_one({
+                'collab_id': app['collab_id'],
+                'status': 'completed'
+            }, {'_id': 0})
+            
+            if collab:
+                existing = await db.reviews.find_one({
+                    'application_id': app['application_id'],
+                    'reviewer_user_id': user['user_id']
+                })
+                if not existing:
+                    pending.append({
+                        'application': app,
+                        'collaboration': collab
+                    })
+    
+    return pending
+
+@api_router.get("/influencers/top")
+async def get_top_influencers(limit: int = 10):
+    """Get top influencers by rating"""
+    # Get influencers with ratings, sorted by avg_rating desc
+    influencers = await db.influencer_profiles.find(
+        {'avg_rating': {'$exists': True, '$gt': 0}},
+        {'_id': 0}
+    ).sort('avg_rating', -1).limit(limit).to_list(limit)
+    
+    # Enrich with user data
+    for inf in influencers:
+        user = await db.users.find_one({'user_id': inf['user_id']}, {'_id': 0, 'password_hash': 0})
+        inf['user'] = user
+    
+    return influencers
+
 # ============ PAYMENT ENDPOINTS ============
 
 PRO_PLANS = {
