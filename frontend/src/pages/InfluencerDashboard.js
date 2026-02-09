@@ -617,6 +617,36 @@ const InfluencerDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dispute Dialog */}
+      {actionCollab && (
+        <DisputeDialog
+          collabId={actionCollab.collab_id}
+          collabTitle={actionCollab.title}
+          open={disputeOpen}
+          onOpenChange={setDisputeOpen}
+          onSuccess={() => {
+            setDisputeOpen(false);
+            // Refresh applications
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* Cancellation Dialog */}
+      {actionCollab && (
+        <CancellationDialog
+          collabId={actionCollab.collab_id}
+          collabTitle={actionCollab.title}
+          collabStatus={actionCollab.status}
+          open={cancelOpen}
+          onOpenChange={setCancelOpen}
+          onSuccess={() => {
+            setCancelOpen(false);
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 };
