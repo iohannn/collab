@@ -98,6 +98,18 @@ export const CollaborationCard = ({ collaboration, onClick }) => {
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-4">
         <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{t('collab.budget')}</p>
         <p className="text-2xl font-mono font-bold text-primary">{formatBudget()}</p>
+        {collaboration.collaboration_type === 'paid' && collaboration.payment_status === 'secured' && (
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-green-600 font-medium">
+            <Shield className="w-3.5 h-3.5" />
+            <span>Fonduri securizate</span>
+          </div>
+        )}
+        {collaboration.collaboration_type === 'barter' && (
+          <span className="text-xs text-muted-foreground">Barter</span>
+        )}
+        {collaboration.collaboration_type === 'free' && (
+          <span className="text-xs text-muted-foreground">Gratuită</span>
+        )}
       </div>
 
       {/* Footer */}
