@@ -5,6 +5,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import json
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any
@@ -13,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 import httpx
+import stripe
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -33,6 +35,9 @@ JWT_EXPIRY_DAYS = 7
 
 # Stripe
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+if STRIPE_API_KEY:
+    stripe.api_key = STRIPE_API_KEY
 
 # Email Config (for cPanel SMTP)
 SMTP_HOST = os.environ.get('SMTP_HOST', 'localhost')
@@ -1850,8 +1855,27 @@ PRO_PLANS = {
     'featured': {'amount': 9.00, 'currency': 'eur', 'duration_days': 7, 'name': 'Featured Placement'}
 }
 
+ZERO_DECIMAL_CURRENCIES = {
+    "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga",
+    "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"
+}
+
+
+def require_stripe_config():
+    if not STRIPE_API_KEY:
+        raise HTTPException(status_code=503, detail="Stripe is not configured")
+
+
+def amount_to_minor_units(amount: float, currency: str) -> int:
+    currency = (currency or "").lower()
+    if currency in ZERO_DECIMAL_CURRENCIES:
+        return int(round(amount))
+    return int(round(amount * 100))
+
+
 @api_router.post("/payments/checkout")
 async def create_checkout(request: Request):
+    require_stripe_config()
     user = await require_auth(request)
     body = await request.json()
     plan_id = body.get('plan_id')
@@ -1859,116 +1883,137 @@ async def create_checkout(request: Request):
     
     if plan_id not in PRO_PLANS:
         raise HTTPException(status_code=400, detail="Invalid plan")
+    if not origin_url:
+        raise HTTPException(status_code=400, detail="Missing origin_url")
     
     plan = PRO_PLANS[plan_id]
-    
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
-    
+    amount_minor = amount_to_minor_units(plan['amount'], plan['currency'])
+
     success_url = f"{origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{origin_url}/pricing"
-    
-    host_url = str(request.base_url)
-    webhook_url = f"{host_url}api/webhook/stripe"
-    
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
-    
-    checkout_request = CheckoutSessionRequest(
-        amount=plan['amount'],
-        currency=plan['currency'],
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata={
-            'user_id': user['user_id'],
-            'plan_id': plan_id,
-            'plan_name': plan['name']
-        }
-    )
-    
-    session = await stripe_checkout.create_checkout_session(checkout_request)
-    
+
+    try:
+        session = await asyncio.to_thread(
+            stripe.checkout.Session.create,
+            mode="payment",
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": plan['currency'],
+                    "product_data": {"name": plan['name']},
+                    "unit_amount": amount_minor
+                },
+                "quantity": 1
+            }],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                'user_id': user['user_id'],
+                'plan_id': plan_id,
+                'plan_name': plan['name']
+            }
+        )
+    except Exception as e:
+        logger.error(f"Stripe checkout creation failed: {e}")
+        raise HTTPException(status_code=502, detail="Unable to create checkout session")
+
     transaction_id = f"txn_{uuid.uuid4().hex[:12]}"
     await db.payment_transactions.insert_one({
         'transaction_id': transaction_id,
         'user_id': user['user_id'],
-        'session_id': session.session_id,
+        'session_id': session.get("id"),
         'amount': plan['amount'],
         'currency': plan['currency'],
         'plan_type': plan_id,
         'status': 'pending',
-        'created_at': datetime.now(timezone.utc).isoformat()
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'checkout_url': session.get("url")
     })
     
-    return {'url': session.url, 'session_id': session.session_id}
+    return {'url': session.get("url"), 'session_id': session.get("id")}
 
 @api_router.get("/payments/status/{session_id}")
 async def get_payment_status(session_id: str, request: Request):
+    require_stripe_config()
     user = await require_auth(request)
-    
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout
-    
-    host_url = str(request.base_url)
-    webhook_url = f"{host_url}api/webhook/stripe"
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
-    
-    status = await stripe_checkout.get_checkout_status(session_id)
-    
-    if status.payment_status == 'paid':
-        txn = await db.payment_transactions.find_one({'session_id': session_id})
-        if txn and txn['status'] != 'completed':
-            plan_id = txn.get('plan_type')
-            plan = PRO_PLANS.get(plan_id, {})
-            duration_days = plan.get('duration_days', 30)
-            
-            await db.payment_transactions.update_one(
-                {'session_id': session_id},
-                {'$set': {'status': 'completed'}}
-            )
-            
-            pro_expires = datetime.now(timezone.utc) + timedelta(days=duration_days)
-            await db.users.update_one(
-                {'user_id': user['user_id']},
-                {'$set': {'is_pro': True, 'pro_expires_at': pro_expires.isoformat()}}
-            )
+
+    txn = await db.payment_transactions.find_one({'session_id': session_id})
+    if not txn or txn.get('user_id') != user['user_id']:
+        raise HTTPException(status_code=404, detail="Payment session not found")
+
+    try:
+        session = await asyncio.to_thread(stripe.checkout.Session.retrieve, session_id)
+    except Exception as e:
+        logger.error(f"Stripe status lookup failed: {e}")
+        raise HTTPException(status_code=502, detail="Unable to check payment status")
+
+    payment_status = session.get("payment_status")
+    status = session.get("status")
+
+    if payment_status == 'paid' and txn.get('status') != 'completed':
+        plan_id = txn.get('plan_type')
+        plan = PRO_PLANS.get(plan_id, {})
+        duration_days = plan.get('duration_days', 30)
+
+        await db.payment_transactions.update_one(
+            {'session_id': session_id},
+            {'$set': {'status': 'completed'}}
+        )
+
+        pro_expires = datetime.now(timezone.utc) + timedelta(days=duration_days)
+        await db.users.update_one(
+            {'user_id': user['user_id']},
+            {'$set': {'is_pro': True, 'pro_expires_at': pro_expires.isoformat()}}
+        )
     
     return {
-        'status': status.status,
-        'payment_status': status.payment_status,
-        'amount_total': status.amount_total,
-        'currency': status.currency
+        'status': status,
+        'payment_status': payment_status,
+        'amount_total': session.get("amount_total"),
+        'currency': session.get("currency")
     }
 
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
-    from emergentintegrations.payments.stripe.checkout import StripeCheckout
-    
+    require_stripe_config()
     body = await request.body()
     signature = request.headers.get("Stripe-Signature")
     
-    host_url = str(request.base_url)
-    webhook_url = f"{host_url}api/webhook/stripe"
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
-    
     try:
-        event = await stripe_checkout.handle_webhook(body, signature)
-        
-        if event.payment_status == 'paid':
-            session_id = event.session_id
-            txn = await db.payment_transactions.find_one({'session_id': session_id})
-            if txn and txn['status'] != 'completed':
-                plan_id = txn.get('plan_type')
-                plan = PRO_PLANS.get(plan_id, {})
-                duration_days = plan.get('duration_days', 30)
-                
-                await db.payment_transactions.update_one(
-                    {'session_id': session_id},
-                    {'$set': {'status': 'completed'}}
-                )
-                
-                pro_expires = datetime.now(timezone.utc) + timedelta(days=duration_days)
-                await db.users.update_one(
-                    {'user_id': txn['user_id']},
-                    {'$set': {'is_pro': True, 'pro_expires_at': pro_expires.isoformat()}}
-                )
+        if STRIPE_WEBHOOK_SECRET and signature:
+            event = await asyncio.to_thread(
+                stripe.Webhook.construct_event,
+                body,
+                signature,
+                STRIPE_WEBHOOK_SECRET
+            )
+        else:
+            logger.warning("STRIPE_WEBHOOK_SECRET missing; accepting unverified webhook payload")
+            event = json.loads(body.decode("utf-8"))
+
+        event_type = event.get('type')
+        if event_type == 'checkout.session.completed':
+            session_obj = event.get('data', {}).get('object', {})
+            session_id = session_obj.get('id')
+            payment_status = session_obj.get('payment_status')
+
+            if session_id and payment_status == 'paid':
+                txn = await db.payment_transactions.find_one({'session_id': session_id})
+                if txn and txn['status'] != 'completed':
+                    plan_id = txn.get('plan_type')
+                    plan = PRO_PLANS.get(plan_id, {})
+                    duration_days = plan.get('duration_days', 30)
+
+                    await db.payment_transactions.update_one(
+                        {'session_id': session_id},
+                        {'$set': {'status': 'completed'}}
+                    )
+
+                    pro_expires = datetime.now(timezone.utc) + timedelta(days=duration_days)
+                    await db.users.update_one(
+                        {'user_id': txn['user_id']},
+                        {'$set': {'is_pro': True, 'pro_expires_at': pro_expires.isoformat()}}
+                    )
         
         return {'received': True}
     except Exception as e:
